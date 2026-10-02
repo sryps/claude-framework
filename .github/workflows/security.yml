@@ -75,9 +75,6 @@ jobs:
         --recursive
         ./
 
-  # Needs the repository's dependency graph: Settings > Code security >
-  # Dependency graph. Without it this job fails with "Dependency review is
-  # not supported on this repository". osv-scanner covers the same CVEs.
   dependency-review:
     name: dependency review
     if: github.event_name == 'pull_request'
@@ -87,10 +84,26 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Skip, with a notice, when the repository's dependency graph is off.
+      # The framework does not change repository settings; osv-scanner still
+      # checks dependencies for known vulnerabilities.
+      - name: Check dependency graph
+        id: graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/dependency-graph/sbom" --silent 2>/dev/null; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Dependency review skipped::The dependency graph is off for this repository (Settings > Code security). osv-scanner still checks dependencies."
+          fi
+      - if: steps.graph.outputs.enabled == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+      - if: steps.graph.outputs.enabled == 'true'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
           deny-licenses: AGPL-3.0, GPL-3.0
