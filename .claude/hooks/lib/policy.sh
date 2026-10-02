@@ -31,6 +31,19 @@ FW_SECRET_TEMPLATE_RE='\.(example|sample|template|dist|defaults)(\.[A-Za-z0-9]+)
 # Test files, fixtures, and test setup. Used by test-writer-scope.sh.
 FW_TEST_PATH_RE='(^|/)(__tests__|__mocks__|__snapshots__|__fixtures__|tests?|specs?|e2e|cypress|playwright|\.maestro|testdata|fixtures)/|\.(test|spec)\.[A-Za-z0-9]+$|_test\.(go|py|ts|js|rb|exs?)$|(^|/)test_[^/]*\.py$|[A-Za-z0-9](Test|Tests|Spec)\.(swift|kt|java|cs|scala)$|(^|/)(conftest\.py|(jest|vitest)\.setup\.[cm]?[jt]s|playwright\.config\.[cm]?[jt]s)$'
 
+# fw_is_test_change <path>. A test file that is not documentation, so a spec
+# in docs/specs/ or a README under tests/ never counts as a test.
+fw_is_test_change() {
+  printf '%s' "$1" | grep -qE "$FW_TEST_PATH_RE" || return 1
+  printf '%s' "$1" | grep -qiE '\.(md|markdown|txt|rst|adoc)$' && return 1
+  return 0
+}
+
+# Source code. A branch that changes these needs tests, verification, and a
+# spec reference in the PR (pr-gate.sh). Test files match FW_TEST_PATH_RE
+# first and do not count as code.
+FW_CODE_RE='\.(js|jsx|ts|tsx|mjs|cjs|vue|svelte|astro|py|go|rs|rb|java|kt|kts|swift|m|mm|cs|fs|php|c|cc|cpp|h|hpp|scala|dart|ex|exs|erl|clj|lua|zig|sh|bash|sql)$'
+
 FW_LOCKFILE_RE='(^|/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|pubspec\.lock|flake\.lock)$'
 
 # Files that control the agent itself. An agent that edits these can turn off

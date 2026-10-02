@@ -32,8 +32,9 @@ Never commit on `main`, `master`, or a release branch. A hook blocks it.
 
 ## 3. Spec and threat notes
 
-Write a short spec in your head or in the PR draft:
-- What changes, for whom, and the acceptance criteria.
+Tests only prove the code matches the spec. Run the `spec` skill first: it finds or writes `docs/specs/<feature>.md`, gives each criterion an ID (`AC-1`), and lists the gaps. Attended, ask the user about gaps that change what they see, what data is kept, or who can do what. Autonomous, record each gap and your choice. See `.claude/rules/specs.md`.
+
+Then note:
 - The inputs that cross a trust boundary (user input, network, files, other services).
 - The data that the change reads or writes, and who may see it.
 
@@ -46,7 +47,7 @@ For Yellow work, run the `threat-model` skill before you write code. For a new o
 ## 4. Tests first
 
 1. Run the `test-strategy` skill to pick the levels: unit, integration, contract, regression, e2e. For a bug fix, write the regression test first and confirm it reproduces the bug.
-2. Write tests for each acceptance criterion. Run them. Confirm they fail for the right reason.
+2. Write tests for each acceptance criterion and name the criterion in the test (`it("AC-2: ...")`). Run them. Confirm they fail for the right reason.
 3. Add negative tests: bad input, missing auth, wrong user, empty and boundary values.
 4. For a large or unfamiliar area, delegate to the `test-writer` subagent with the criteria.
 
@@ -90,6 +91,8 @@ For any user-visible change (UI, screen, route, API response, CLI output), run t
    ## Summary
    - <what and why>
 
+   Spec: docs/specs/<feature>.md
+
    ## Changes
    - <file>: <change>
 
@@ -99,7 +102,10 @@ For any user-visible change (UI, screen, route, API response, CLI output), run t
    ## Verification
    | Criterion | Result | Evidence |
    |---|---|---|
-   | <criterion> | PASS | .claude/runs/<id>/evidence/<file> |
+   | AC-1 <short text> | PASS | .claude/runs/<id>/evidence/<file> |
+
+   ## Spec gaps and assumptions
+   - <what the spec did not decide>: <what you chose, and why>
 
    ## Decisions
    - <choice>: <reason>
@@ -110,7 +116,7 @@ For any user-visible change (UI, screen, route, API response, CLI output), run t
    ## Dependencies
    - <package@version>: <reason> (only when you added one)
    ```
-   Omit `Security-Review:` only when no Yellow file changed. A hook blocks the PR if it is missing.
+   `pr-gate` blocks the PR when the branch changes code and the body lacks any of: test changes (or a `No-Test-Reason:` line), a filled Verification row, a `Spec:` line, or the Spec gaps section ("none" is allowed there). It also requires `Security-Review:` to name each Yellow file.
 3. Create the PR, or the merge request on GitLab. Pick the row that matches the remote:
 
    | Remote | Command |

@@ -13,6 +13,19 @@ The hooks run on every tool call. They block what an agent must never do and che
 3. Agents never ship. They branch, commit, open a PR, and stop. Merge, deploy, release, and secrets stay with a human.
 4. One base and many overlays. The base works for any stack. Stack-specific rules live in overlays.
 
+## Specs and drift
+
+Tests prove the code matches the spec. They cannot prove the spec matches what you meant. Where the spec is silent, the agent guesses, and each guess is a place where your intent and the code can drift apart.
+
+The framework makes those guesses visible:
+- The `spec` skill writes or tightens `docs/specs/<feature>.md`, with an ID per acceptance criterion and a decision for each edge case. Attended, it asks you about the gaps that matter. Autonomous, it records its choice.
+- Each test names the criterion it proves (`AC-2`). Each criterion gets a Verification row in the PR.
+- Every PR that changes code has a `## Spec gaps and assumptions` section. Read it: it lists what the agent decided for you.
+- `pr-gate` blocks a code PR without tests (or a `No-Test-Reason:`), a filled Verification row, a `Spec:` line, or the Spec gaps section.
+- `test-guard` blocks a `fix:` commit with no test change.
+
+A thin spec still produces passing tests. Write the spec with the agent before the code, and read the Spec gaps section before you merge.
+
 ## Tiers
 
 | Tier | Agent may | Examples | Enforced by |
@@ -77,8 +90,8 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 |---|---|---|
 | SessionStart | `session-start` | Profile rules, git state, protected-branch warning, detected stack, missing tools |
 | PreToolUse Bash | `bash-guard` | Blocks Red commands in any spelling: `git -C . push origin main`, `bash -c "..."`, `head .env`, `curl \| sh`, deploys, publishes, destructive SQL, `rm -rf` outside the project |
-| PreToolUse Bash | `pr-gate` | `gh pr create`, `glab mr create`, and `tea pr create` need a `Security-Review:` section that names each Yellow file on the branch (or a parent directory with a trailing slash). Empty, "none", and template placeholders do not count |
-| PreToolUse Bash | `test-guard` | Blocks a commit that skips tests or removes assertions (autonomous) |
+| PreToolUse Bash | `pr-gate` | Gates `gh pr create`, `glab mr create`, and `tea pr create`. A branch that changes code needs test changes (or `No-Test-Reason:`), a filled Verification row, a `Spec:` line, and a Spec gaps section. A branch that touches Yellow paths needs a `Security-Review:` section naming each Yellow file (or a parent directory with a trailing slash). Empty sections and template placeholders do not count |
+| PreToolUse Bash | `test-guard` | Blocks a `fix:` commit with no test change (escape: `No-Test-Reason:`), and a commit that skips tests or removes assertions (escape: `Test-Change-Reason:`). Every session |
 | PreToolUse Edit/Write | `protected-paths` | Blocks secrets, lockfiles, agent settings, git internals, files outside the project |
 | PreToolUse Edit/Write | `secret-write-guard` | Blocks content that contains a credential |
 | PreToolUse Edit/Write | `test-writer-scope` | Blocks the `test-writer` subagent from editing anything but tests and fixtures |
@@ -93,6 +106,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | Skill | Use |
 |---|---|
 | `feature` | The main loop: spec, threat notes, tests, code, self-review, verification, PR |
+| `spec` | Write or tighten the spec: criterion IDs, edge cases, permissions, and the gaps the user must decide |
 | `test-strategy` | Pick test levels (unit, integration, contract, regression, e2e) and set up test tools |
 | `verify-spec` | Drive the running app (headless browser, Android emulator, iOS simulator, CLI, API) and check each acceptance criterion, with evidence |
 | `threat-model` | STRIDE pass, writes `docs/THREAT_MODEL.md` |
@@ -120,7 +134,7 @@ The `test-writer-scope` hook blocks any edit outside test files and fixtures whe
 |---|---|
 | `.claude/settings.json` | Base permissions, hook wiring, and stack overlays |
 | `.claude/settings.autonomous.json` | The autonomous profile and cloud CLI denies, passed with `--settings` on top of `settings.json`. Claude Code combines permission lists across settings files. Generated: a re-run replaces it |
-| `.claude/rules/*.md` | Security, auth, API, backend, frontend, data, mobile, CLI, testing, agentic verification, dependencies, CI/CD, logging |
+| `.claude/rules/*.md` | Security, specs, auth, API, backend, frontend, data, mobile, CLI, testing, agentic verification, dependencies, CI/CD, logging |
 | `.claude/output-styles/` | Terse (attended) and Autonomous (unattended) |
 | `CLAUDE.md` | Project template under 100 lines |
 | `SECURITY.md`, `.claude/pull_request_template.md` | Disclosure policy and a PR template with `Security-Review:` and `Verification` |
@@ -142,7 +156,8 @@ Set these in the `env` block of the project `.claude/settings.json`.
 | `FW_GUARD_ALLOW` | ERE. A matching command skips `bash-guard`. For a human-approved exception, such as `^make deploy-staging$` |
 | `FW_RED_PATHS_EXTRA`, `FW_YELLOW_PATHS_EXTRA` | ERE. Extra Red or Yellow paths |
 | `FW_SECRET_ALLOW` | ERE. Lines that never count as secrets |
-| `FW_TEST_GATE=always`, `FW_TEST_GUARD=always`, `FW_SAST=always` | Run those checks in attended sessions too |
+| `FW_TEST_GATE=always`, `FW_SAST=always` | Run those checks in attended sessions too |
+| `FW_TEST_GUARD=off` | Turn off `test-guard` |
 | `CLAUDE_TEST_CMD` | The test command for `test-gate`. The default is detected |
 | `CLAUDE_TEST_TIMEOUT`, `CLAUDE_TEST_MAX_ATTEMPTS` | Test gate limits |
 | `FW_SEMGREP_CONFIG` | semgrep rules. The default is `p/default` |

@@ -30,10 +30,12 @@ Nobody is watching this run.
 4. Red tier is blocked by hooks: merge, push to a protected branch, force push, deploy, publish, secrets, prod data. Do not look for another spelling.
 5. Yellow tier (auth, crypto, migrations, CI, infra, dependencies) is allowed on a branch. The PR needs a Security-Review: section.
 6. End on a branch with a PR. Never merge it.
-7. End with the full final report."
+7. End with the full final report.
+8. Tests only prove the code matches the spec. Record every gap in the spec and the choice you made under Spec gaps in the PR."
 else
   add "## Framework: attended profile
-Tiers: Green = do it. Yellow (auth, crypto, migrations, CI, infra, dependencies) = do it on a branch and add a Security-Review: section to the PR. Red (merge, protected-branch push, force push, deploy, publish, secrets, prod data) = hooks block it; ask the user instead."
+Tiers: Green = do it. Yellow (auth, crypto, migrations, CI, infra, dependencies) = do it on a branch and add a Security-Review: section to the PR. Red (merge, protected-branch push, force push, deploy, publish, secrets, prod data) = hooks block it; ask the user instead.
+Specs: tests only prove the code matches the spec. Before code, find the gaps (run the spec skill) and ask the user about the ones that change what they see, what data is kept, or who can do what."
 fi
 
 if [ "${FW_SESSION_GIT:-1}" != 0 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

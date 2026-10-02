@@ -376,33 +376,60 @@ rn "main agent not muted by subagent" "src/auth/session.ts" "rules/auth.md" r10
 rm -rf "$REPO/.claude/rules"
 
 # --- pr-gate ---
-mkdir -p "$REPO/src/auth"
-echo "export const x = 1" > "$REPO/src/auth/login.ts"
-git add -A && git commit -qm "auth"
-expect "pr-gate block without section" 2 pr-gate "$(json_bash "gh pr create --title t --body 'no review'")"
-printf 'Summary\n\nSecurity-Review:\n- src/auth/login.ts: checked\n' > "$TMP/body.md"
-expect "pr-gate allow with body file" 0 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/body.md")"
-mkdir -p "$REPO/.claude/runs" && cp "$TMP/body.md" "$REPO/.claude/runs/pr-body.md"
-expect "pr-gate allow relative body file" 0 pr-gate "$(json_bash "gh pr create --title t --body-file .claude/runs/pr-body.md")"
-cp "$TMP/body.md" "$TMP/pr-body.md"
-expect "pr-gate allow TMPDIR body file" 0 pr-gate "$(json_bash 'gh pr create --title t --body-file "${TMPDIR:-/tmp}/pr-body.md"')"
-expect "pr-gate block vague inline" 2 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: ok'")"
-expect "pr-gate allow inline naming file" 0 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src/auth/login.ts checked, deny test added'")"
-expect "pr-gate allow parent directory" 0 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src/auth/ reviewed for IDOR'")"
-expect "pr-gate block bare parent without slash" 2 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src reviewed'")"
-printf '## Security-Review:\n\n<!--\n- src/auth/login.ts: hidden in a comment\n-->\n- none\n\n## Decisions\n- src/auth/login.ts named outside the section\n' > "$TMP/tpl.md"
-expect "pr-gate block template left as is" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/tpl.md")"
-printf 'Security-Review:\n- <file>: <risk you checked> -> <how>\n' > "$TMP/ph.md"
-expect "pr-gate block placeholder" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/ph.md")"
-mkdir -p "$REPO/supabase/migrations" && echo "create table t();" > "$REPO/supabase/migrations/001.sql" && git add -A && git commit -qm mig
-expect "pr-gate block when one yellow file is missing" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/body.md")"
-printf 'Security-Review:\n- src/auth/login.ts: checked\n- supabase/migrations/001.sql: RLS on, policy test added\n' > "$TMP/body2.md"
-expect "pr-gate allow when every yellow file is named" 0 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/body2.md")"
-cp "$TMP/body2.md" "$TMP/body.md"; cp "$TMP/body2.md" "$TMP/pr-body.md"; cp "$TMP/body2.md" "$REPO/.claude/runs/pr-body.md"
-expect "pr-gate glab block without section" 2 pr-gate "$(json_bash "glab mr create --title t --description 'no review'")"
-expect "pr-gate glab allow cat body" 0 pr-gate "$(json_bash 'glab mr create --title t --description "$(cat .claude/runs/pr-body.md)"')"
-expect "pr-gate tea block without section" 2 pr-gate "$(json_bash "tea pr create --title t --description x")"
-expect "pr-gate ignores other commands" 0 pr-gate "$(json_bash "gh pr view")"
+pg() { expect "pr-gate $1" "$2" pr-gate "$(json_bash "$3")"; }
+pgf() { printf '%b' "$3" > "$TMP/b.md"; expect "pr-gate $1" "$2" pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/b.md")"; }
+
+# Phase A: Yellow files only, no code.
+mkdir -p "$REPO/.github/workflows"
+echo '{"name":"x"}' > "$REPO/package.json"
+echo "on: push" > "$REPO/.github/workflows/ci.yml"
+git add -A && git commit -qm "yellow only"
+SR='## Security-Review:\n- package.json: no new dependency\n- .github/workflows/ci.yml: pinned SHAs\n'
+pg "block without section" 2 "gh pr create --title t --body 'no review'"
+pgf "allow when every yellow file is named" 0 "$SR"
+mkdir -p "$REPO/.claude/runs" && cp "$TMP/b.md" "$REPO/.claude/runs/pr-body.md" && cp "$TMP/b.md" "$TMP/pr-body.md"
+pg "allow relative body file" 0 "gh pr create --title t --body-file .claude/runs/pr-body.md"
+pg "allow TMPDIR body file" 0 'gh pr create --title t --body-file "${TMPDIR:-/tmp}/pr-body.md"'
+pg "glab allow cat body" 0 'glab mr create --title t --description "$(cat .claude/runs/pr-body.md)"'
+pg "glab block without section" 2 "glab mr create --title t --description 'no review'"
+pg "tea block without section" 2 "tea pr create --title t --description x"
+pg "block vague inline" 2 "gh pr create --title t --body 'Security-Review: ok'"
+pg "allow inline naming files" 0 "gh pr create --title t --body 'Security-Review: package.json and .github/ checked'"
+pg "block bare parent without slash" 2 "gh pr create --title t --body 'Security-Review: package.json and .github checked'"
+pgf "block when one yellow file is missing" 2 'Security-Review:\n- package.json: ok\n'
+pgf "block template left as is" 2 '## Security-Review:\n\n<!--\n- package.json and .github/ in a comment\n-->\n- none\n\n## Decisions\n- package.json and .github/ outside the section\n'
+pgf "block placeholder" 2 'Security-Review:\n- <file>: <risk you checked> -> <how>\n'
+pg "ignores other commands" 0 "gh pr view"
+
+# Phase B: the branch changes code.
+mkdir -p "$REPO/src/app" "$REPO/docs/specs"
+echo "export const page = 1" > "$REPO/src/app/pager.ts"
+echo "# Pager spec" > "$REPO/docs/specs/pager.md"
+git add -A && git commit -qm "code"
+VER='## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| AC-1 last page shows | PASS | .claude/runs/1/evidence/last.png |\n\n'
+SPEC='Spec: docs/specs/pager.md\n\n'
+GAPS='## Spec gaps and assumptions\n\n- The spec does not say the page size. I used 20, the current default.\n\n'
+pgf "block code without tests" 2 "$SPEC$VER$GAPS$SR"
+pgf "spec doc is not a test" 2 "$SPEC$VER$GAPS$SR"
+pgf "allow code with No-Test-Reason" 0 "No-Test-Reason: generated file\n\n$SPEC$VER$GAPS$SR"
+mkdir -p "$REPO/tests" && echo 'test("p", () => { expect(1).toBe(1) })' > "$REPO/tests/pager.test.ts" && git add -A && git commit -qm "test"
+pgf "allow complete body" 0 "$SPEC$VER$GAPS$SR"
+pgf "block missing Verification" 2 "$SPEC$GAPS$SR"
+pgf "block empty Verification row" 2 "$SPEC## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| | | |\n\n$GAPS$SR"
+pgf "block Verification placeholder" 2 "$SPEC## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| <criterion> | PASS | <path> |\n\n$GAPS$SR"
+pgf "block PASS without evidence" 2 "$SPEC## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| AC-1 | PASS | |\n\n$GAPS$SR"
+pgf "allow NOT VERIFIED with reason" 0 "$SPEC## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| AC-1 | NOT VERIFIED | no Android emulator on this machine |\n\n$GAPS$SR"
+pgf "block missing Spec" 2 "$VER$GAPS$SR"
+pgf "block Spec to missing file" 2 "Spec: docs/specs/nope.md\n\n$VER$GAPS$SR"
+pgf "allow Spec URL" 0 "Spec: https://example.com/issues/12\n\n$VER$GAPS$SR"
+pgf "allow Spec issue ref" 0 "Spec: #12\n\n$VER$GAPS$SR"
+pgf "allow bold Spec line" 0 "**Spec:** docs/specs/pager.md\n\n$VER$GAPS$SR"
+pgf "block missing Spec gaps" 2 "$SPEC$VER$SR"
+pgf "block empty Spec gaps" 2 "$SPEC$VER## Spec gaps and assumptions\n\n## Next\n$SR"
+pgf "allow Spec gaps none" 0 "$SPEC$VER## Spec gaps and assumptions\n\n- none\n\n$SR"
+pgf "block Spec gaps bare bullet" 2 "$SPEC$VER## Spec gaps and assumptions\n\n-\n\n$SR"
+pgf "block untouched PR template" 2 "$(cat "$HOOKS/../framework/templates/pull_request_template.md")"
+cp "$TMP/b.md" "$REPO/.claude/runs/pr-body.md"
 
 # --- test-guard ---
 export CLAUDE_PROFILE=autonomous
@@ -421,7 +448,25 @@ git add -A
 expect "test-guard allow more assertions" 0 test-guard "$(json_bash "git commit -m x")"
 git commit -qm more
 unset CLAUDE_PROFILE
-expect "test-guard off when attended" 0 test-guard "$(json_bash "git commit -m x")"
+
+# A fix needs a test, in every session.
+echo "export const y = 2" > "$REPO/src/y.ts"; git add -A
+expect "test-guard block fix without test" 2 test-guard "$(json_bash "git commit -m 'fix: off-by-one in pager'")"
+expect "test-guard block scoped fix without test" 2 test-guard "$(json_bash "git add -A && git commit -qm \"fix(api): wrong status\"")"
+expect "test-guard allow fix with reason" 0 test-guard "$(json_bash "git commit -m 'fix: typo in log text' -m 'No-Test-Reason: log wording only'")"
+expect "test-guard allow feat without test" 0 test-guard "$(json_bash "git commit -m 'feat: add y'")"
+printf 'fix: pager skips last page\n\nNo-Test-Reason: none\n' > "$TMP/msg1"
+printf 'fix: pager skips last page\n' > "$TMP/msg2"
+expect "test-guard reads -F subject" 2 test-guard "$(json_bash "git commit -F $TMP/msg2")"
+expect "test-guard reads -F trailer" 0 test-guard "$(json_bash "git commit -F $TMP/msg1")"
+printf 'test("pager", () => {\n  expect(1).toBe(1)\n})\n' > "$REPO/tests/pager.test.ts"; git add -A
+expect "test-guard allow fix with test" 0 test-guard "$(json_bash "git commit -m 'fix: off-by-one in pager'")"
+git commit -qm "fix: pager"
+export FW_TEST_GUARD=off
+echo "export const z = 3" > "$REPO/src/z.ts"; git add -A
+expect "test-guard off switch" 0 test-guard "$(json_bash "git commit -m 'fix: z'")"
+unset FW_TEST_GUARD
+git commit -qm z
 
 # --- test-gate ---
 export CLAUDE_PROFILE=autonomous

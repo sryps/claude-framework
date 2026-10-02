@@ -82,6 +82,9 @@ Write in ASD-STE100 Simplified Technical English: short sentences, active voice,
 **Decisions**
 - One bullet per choice you made without the user: what, and why.
 
+**Spec gaps**
+- Each behavior the spec did not decide, and the choice you made. The user reads this to catch drift between what they meant and what you built.
+
 **Blocked**
 - Each failure you could not fix, with the exact error and what you tried.
 - Each step a hard limit stopped.
