@@ -194,7 +194,7 @@ if [ "$inplace" = 0 ]; then
       sync_file "$SRC/.claude/$dir/$f" "$target/.claude/$dir/$f"
     done <"$tmp/files"
   done
-  for f in scripts/security-check.sh scripts/claude-autonomous.sh .githooks/pre-commit .githooks/pre-push; do
+  for f in scripts/security-check.sh scripts/claude-autonomous.sh scripts/approve-spec.sh .githooks/pre-commit .githooks/pre-push; do
     sync_file "$SRC/$f" "$target/$f"
   done
 fi

@@ -76,6 +76,12 @@ fw_timeout() {
   fi
 }
 
+# fw_sha256 <file>. GNU coreutils or macOS shasum.
+fw_sha256() {
+  if fw_have sha256sum; then sha256sum "$1" | awk '{print $1}'
+  else shasum -a 256 "$1" | awk '{print $1}'; fi
+}
+
 # fw_block <message>. Exit 2 blocks the tool call or the stop and sends
 # stderr back to Claude.
 fw_block() {

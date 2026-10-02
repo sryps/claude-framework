@@ -186,7 +186,9 @@ check_segment() {
   done
 
   # --- agent control files ---
-  guard_re='\.claude/settings[^[:space:]]*\.json|\.git/hooks/|core\.hooksPath'
+  # Spec approvals are the human's: agents never run the approval script or
+  # write approvals, not even in maintainer mode.
+  guard_re='\.claude/settings[^[:space:]]*\.json|\.git/hooks/|core\.hooksPath|\.claude/approvals/|approve-spec\.sh'
   fw_maintainer || guard_re="$guard_re|\.claude/hooks/|\.claude/framework/|\.githooks/"
   if printf '%s' "$s" | grep -qE "$guard_re"; then
     # Reading is fine. So is running the framework's own checks. A write

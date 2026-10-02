@@ -25,6 +25,11 @@ fw_read_input
 cmd=$(fw_get '.tool_input.command')
 [ -z "$cmd" ] && exit 0
 printf '%s' "$cmd" | grep -qE "(^|[;&|[:space:]])(gh[[:space:]]+pr[[:space:]]+(create|new|edit)|glab[[:space:]]+mr[[:space:]]+(create|new|update)|tea[[:space:]]+(pr|pulls)[[:space:]]+create)([[:space:]]|$)" || exit 0
+# An edit that does not replace the body (a new base branch, a label) passes.
+if printf '%s' "$cmd" | grep -qE "(gh[[:space:]]+pr[[:space:]]+edit|glab[[:space:]]+mr[[:space:]]+update)" && \
+   ! printf '%s' "$cmd" | grep -qE "[[:space:]](--body|--body-file|-b|-F|--description|-d)([[:space:]=]|$)"; then
+  exit 0
+fi
 fw_enter_project
 cd "$FW_ROOT" 2>/dev/null || exit 0
 
@@ -125,12 +130,17 @@ if [ -n "$code" ]; then
     fi
   fi
 
+  # The branch needs the user's approval of the spec (scripts/approve-spec.sh),
+  # and the Spec: line must name the approved file.
   spec=$(printf '%s\n' "$clean" | grep -E '^[[:space:]]*[-*]?[[:space:]]*(\*\*)?Spec:' | head -1 | sed -E 's/.*Spec:(\*\*)?[[:space:]]*//; s/[[:space:]]+$//; s/^`//; s/`$//')
-  if [ -z "$spec" ] || printf '%s' "$spec" | grep -qE '^<.*>$|^\{\{'; then
-    problem "No 'Spec:' line. Point it at the spec the change implements: a file such as docs/specs/<feature>.md, a URL, or an issue (#123). Run the spec skill when there is none."
-  elif ! printf '%s' "$spec" | grep -qE '://|^#[0-9]+|^[A-Z][A-Z0-9]+-[0-9]+'; then
-    specpath=${spec%%[[:space:]#]*}
-    [ -f "$FW_ROOT/$specpath" ] || problem "Spec: $specpath does not exist in the repo. Commit the spec, or point at a URL or an issue."
+  if [ "${FW_SPEC_GATE:-}" = off ]; then
+    [ -n "$spec" ] || problem "No 'Spec:' line. Point it at the spec the change implements."
+  elif ! approved=$(fw_spec_approval); then
+    problem "Spec approval: $approved Write the spec with the user (spec skill), then the user runs: scripts/approve-spec.sh docs/specs/<feature>.md"
+  elif [ "$approved" = none ]; then
+    [ -n "$spec" ] || problem "No 'Spec:' line. The user approved this branch without a spec, so write: Spec: none (approved without a spec)."
+  elif [ -z "$spec" ] || ! printf '%s' "$spec" | grep -qF -- "$approved"; then
+    problem "The 'Spec:' line must name the approved spec: Spec: $approved"
   fi
 
   if ! printf '%s' "$clean" | grep -qi '## Spec gaps'; then

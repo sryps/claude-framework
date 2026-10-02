@@ -375,6 +375,67 @@ rn "subagent once" "src/auth/b.test.ts" "" r10 sub1
 rn "main agent not muted by subagent" "src/auth/session.ts" "rules/auth.md" r10
 rm -rf "$REPO/.claude/rules"
 
+# --- approve-spec and spec-gate ---
+APPROVE="$HOOKS/../../scripts/approve-spec.sh"
+# run_expect <name> <ok|fail> <command...>. Runs in the test repo.
+run_expect() {
+  local name=$1 want=$2 got
+  shift 2
+  case "$name" in *"$FILTER"*) ;; *) return ;; esac
+  (cd "$REPO" && "$@") >"$TMP/out" 2>&1 && got=ok || got=fail
+  if [ "$got" = "$want" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: want $want, got $got
+$(sed 's/^/      /' "$TMP/out" | head -5)"; fi
+}
+sg() { expect "spec-gate $1: $2" "$3" spec-gate "$(json_write "$REPO/$2" x)"; }
+mkdir -p "$REPO/docs/specs"
+printf '# A\n\n## Acceptance criteria\n\n- AC-1: Given x, when y, then z.\n' > "$REPO/docs/specs/a.md"
+printf '# B\n\nNo criteria here.\n' > "$REPO/docs/specs/b.md"
+printf '# C\n\n- AC-1: Given {{state}}, when y, then z.\n' > "$REPO/docs/specs/c.md"
+sg "no approval blocks code" src/app/a.ts 2
+sg "no approval blocks tests" tests/a.test.ts 2
+sg "spec stays editable" docs/specs/a.md 0
+sg "config stays editable" package.json 0
+sg "docs stay editable" README.md 0
+run_expect "approve-spec refuses a spec without criteria" fail bash "$APPROVE" docs/specs/b.md
+run_expect "approve-spec refuses placeholders" fail bash "$APPROVE" docs/specs/c.md
+run_expect "approve-spec refuses a missing file" fail bash "$APPROVE" docs/specs/none.md
+run_expect "approve-spec approves a good spec" ok bash "$APPROVE" docs/specs/a.md
+run_expect "approval file written" ok test -f .claude/approvals/feat_x.json
+run_expect "approve-spec status valid" ok bash "$APPROVE" --status
+sg "approved spec allows code" src/app/a.ts 0
+sg "approved spec allows tests" tests/a.test.ts 0
+printf -- '- AC-2: Given a, when b, then c.\n' >> "$REPO/docs/specs/a.md"
+sg "spec changed after approval blocks code" src/app/a.ts 2
+run_expect "approve-spec status stale" fail bash "$APPROVE" --status
+run_expect "approve-spec re-approves" ok bash "$APPROVE" docs/specs/a.md
+sg "re-approved spec allows code" src/app/a.ts 0
+rm -f "$REPO/docs/specs/a.md"
+sg "deleted spec blocks code" src/app/a.ts 2
+run_expect "approve-spec no-spec needs a reason" fail bash "$APPROVE" --no-spec
+run_expect "approve-spec no-spec with reason" ok bash "$APPROVE" --no-spec "typo fix"
+sg "no-spec approval allows code" src/app/a.ts 0
+run_expect "approve-spec revoke" ok bash "$APPROVE" --revoke
+sg "revoked approval blocks code" src/app/a.ts 2
+export FW_SPEC_GATE=off
+sg "off switch" src/app/a.ts 0
+unset FW_SPEC_GATE
+git checkout -q main
+run_expect "approve-spec refuses the default branch" fail bash "$APPROVE" --no-spec "x"
+git checkout -q feat/x
+rm -f "$REPO/docs/specs/b.md" "$REPO/docs/specs/c.md"
+block "scripts/approve-spec.sh docs/specs/a.md"
+block "bash scripts/approve-spec.sh --no-spec 'tiny'"
+block "echo '{}' > .claude/approvals/feat_x.json"
+block "cp /tmp/x .claude/approvals/feat_x.json"
+allow "cat .claude/approvals/feat_x.json"
+pp block "$REPO/.claude/approvals/feat_x.json" 2
+pp block "$REPO/scripts/approve-spec.sh" 2
+mkdir -p "$REPO/.claude"; printf '{"env":{"FW_MAINTAINER":"1"}}' > "$REPO/.claude/settings.local.json"
+pp block "$REPO/.claude/approvals/feat_x.json" 2
+block "bash scripts/approve-spec.sh docs/specs/a.md"
+rm -f "$REPO/.claude/settings.local.json"
+
 # --- pr-gate ---
 pg() { expect "pr-gate $1" "$2" pr-gate "$(json_bash "$3")"; }
 pgf() { printf '%b' "$3" > "$TMP/b.md"; expect "pr-gate $1" "$2" pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/b.md")"; }
@@ -404,8 +465,9 @@ pg "ignores other commands" 0 "gh pr view"
 # Phase B: the branch changes code.
 mkdir -p "$REPO/src/app" "$REPO/docs/specs"
 echo "export const page = 1" > "$REPO/src/app/pager.ts"
-echo "# Pager spec" > "$REPO/docs/specs/pager.md"
+printf "# Pager spec\n\n- AC-1: Given 41 items, when I open page 3, then I see item 41.\n" > "$REPO/docs/specs/pager.md"
 git add -A && git commit -qm "code"
+(cd "$REPO" && bash "$APPROVE" docs/specs/pager.md >/dev/null)
 VER='## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| AC-1 last page shows | PASS | .claude/runs/1/evidence/last.png |\n\n'
 SPEC='Spec: docs/specs/pager.md\n\n'
 GAPS='## Spec gaps and assumptions\n\n- The spec does not say the page size. I used 20, the current default.\n\n'
@@ -421,11 +483,24 @@ pgf "block PASS without evidence" 2 "$SPEC## Verification\n\n| Criterion | Resul
 pgf "allow NOT VERIFIED with reason" 0 "$SPEC## Verification\n\n| Criterion | Result | Evidence |\n|---|---|---|\n| AC-1 | NOT VERIFIED | no Android emulator on this machine |\n\n$GAPS$SR"
 pgf "block missing Spec" 2 "$VER$GAPS$SR"
 pgf "block Spec to missing file" 2 "Spec: docs/specs/nope.md\n\n$VER$GAPS$SR"
-pgf "allow Spec URL" 0 "Spec: https://example.com/issues/12\n\n$VER$GAPS$SR"
-pgf "allow Spec issue ref" 0 "Spec: #12\n\n$VER$GAPS$SR"
+pgf "block Spec URL instead of approved file" 2 "Spec: https://example.com/issues/12\n\n$VER$GAPS$SR"
+pgf "block Spec naming another file" 2 "Spec: docs/specs/other.md\n\n$VER$GAPS$SR"
 pgf "allow bold Spec line" 0 "**Spec:** docs/specs/pager.md\n\n$VER$GAPS$SR"
 pgf "block missing Spec gaps" 2 "$SPEC$VER$SR"
 pgf "block empty Spec gaps" 2 "$SPEC$VER## Spec gaps and assumptions\n\n## Next\n$SR"
+echo "- AC-9: added after approval" >> "$REPO/docs/specs/pager.md"
+pgf "block spec changed after approval" 2 "$SPEC$VER$GAPS$SR"
+(cd "$REPO" && git checkout -q -- docs/specs/pager.md)
+(cd "$REPO" && bash "$APPROVE" --revoke >/dev/null)
+pgf "block without approval" 2 "$SPEC$VER$GAPS$SR"
+export FW_SPEC_GATE=off
+pgf "spec gate off skips approval" 0 "$SPEC$VER$GAPS$SR"
+pgf "spec gate off still needs a Spec line" 2 "$VER$GAPS$SR"
+unset FW_SPEC_GATE
+(cd "$REPO" && bash "$APPROVE" --no-spec "tiny refactor" >/dev/null)
+pgf "allow no-spec approval with Spec none" 0 "Spec: none (approved without a spec)\n\n$VER$GAPS$SR"
+pgf "block no-spec approval without Spec line" 2 "$VER$GAPS$SR"
+(cd "$REPO" && bash "$APPROVE" docs/specs/pager.md >/dev/null)
 pgf "allow Spec gaps none" 0 "$SPEC$VER## Spec gaps and assumptions\n\n- none\n\n$SR"
 pgf "block Spec gaps bare bullet" 2 "$SPEC$VER## Spec gaps and assumptions\n\n-\n\n$SR"
 pgf "block untouched PR template" 2 "$(cat "$HOOKS/../framework/templates/pull_request_template.md")"

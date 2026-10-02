@@ -31,11 +31,11 @@ Nobody is watching this run.
 5. Yellow tier (auth, crypto, migrations, CI, infra, dependencies) is allowed on a branch. The PR needs a Security-Review: section.
 6. End on a branch with a PR. Never merge it.
 7. End with the full final report.
-8. Tests only prove the code matches the spec. Record every gap in the spec and the choice you made under Spec gaps in the PR."
+8. Code and tests wait for a spec the user approved. Without one, draft the spec (spec skill), commit it, and stop with a draft PR. Record every gap and choice under Spec gaps."
 else
   add "## Framework: attended profile
 Tiers: Green = do it. Yellow (auth, crypto, migrations, CI, infra, dependencies) = do it on a branch and add a Security-Review: section to the PR. Red (merge, protected-branch push, force push, deploy, publish, secrets, prod data) = hooks block it; ask the user instead.
-Specs: tests only prove the code matches the spec. Before code, find the gaps (run the spec skill) and ask the user about the ones that change what they see, what data is kept, or who can do what."
+Specs: code and test edits wait for a spec the user approved for this branch. Run the spec skill to write it with the user, then the user runs scripts/approve-spec.sh."
 fi
 
 if [ "${FW_SESSION_GIT:-1}" != 0 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -86,6 +86,15 @@ ls ./*.tf >/dev/null 2>&1 && stack="$stack terraform"
 if [ -n "$stack" ]; then
   add ""
   add "## Stack:$stack"
+fi
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "${FW_SPEC_GATE:-}" != off ]; then
+  . "$(dirname "$0")/lib/policy.sh"
+  if approval=$(fw_spec_approval); then
+    if [ "$approval" = none ]; then add "Spec: the user approved this branch without a spec."
+    else add "Spec: $approval is approved and unchanged. Code and test edits are open."; fi
+  else
+    add "Spec: $approval Code and test edits are blocked until the user approves a spec."
+  fi
 fi
 if [ -d .claude/rules ]; then
   add "Rules live in .claude/rules/. Read the file for the area you change before you change it (security.md always)."

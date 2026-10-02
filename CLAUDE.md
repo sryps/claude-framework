@@ -34,7 +34,7 @@ The Stop hook runs `make verify` when that target exists. Keep it complete and f
 ## Workflow
 
 1. Start on a feature branch: `git switch -c <type>/<short-name>`.
-2. Find or write the spec in `docs/specs/` (`spec` skill). Tests only prove the code matches the spec, so close the gaps first.
+2. Write the spec with the user (`spec` skill). The user approves it with `scripts/approve-spec.sh docs/specs/<feature>.md`. Code and test edits are blocked until then.
 3. Read the rules file for each area you will change (list below).
 4. Write or update tests first. Name the criterion each test proves (`AC-1`).
 5. Make the smallest change that passes. Commit at each green state.

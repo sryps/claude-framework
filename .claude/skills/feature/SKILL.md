@@ -32,7 +32,9 @@ Never commit on `main`, `master`, or a release branch. A hook blocks it.
 
 ## 3. Spec and threat notes
 
-Tests only prove the code matches the spec. Run the `spec` skill first: it finds or writes `docs/specs/<feature>.md`, gives each criterion an ID (`AC-1`), and lists the gaps. Attended, ask the user about gaps that change what they see, what data is kept, or who can do what. Autonomous, record each gap and your choice. See `.claude/rules/specs.md`.
+Tests only prove the code matches the spec. The `spec-gate` hook blocks code and test edits until the user approves a spec for the branch.
+
+Run the `spec` skill first. It writes `docs/specs/<feature>.md` with the user and ends with the command the user runs to approve it: `scripts/approve-spec.sh docs/specs/<feature>.md`. Wait for the approval. Autonomous: draft the spec, commit it, and stop with a draft PR (the `spec` skill covers this). See `.claude/rules/specs.md`.
 
 Then note:
 - The inputs that cross a trust boundary (user input, network, files, other services).

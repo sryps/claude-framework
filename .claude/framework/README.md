@@ -17,14 +17,23 @@ The hooks run on every tool call. They block what an agent must never do and che
 
 Tests prove the code matches the spec. They cannot prove the spec matches what you meant. Where the spec is silent, the agent guesses, and each guess is a place where your intent and the code can drift apart.
 
-The framework makes those guesses visible:
-- The `spec` skill writes or tightens `docs/specs/<feature>.md`, with an ID per acceptance criterion and a decision for each edge case. Attended, it asks you about the gaps that matter. Autonomous, it records its choice.
+So code waits for a spec you approved:
+
+1. The agent runs the `spec` skill. It explains what a spec is, asks you about each section (goal, permissions, criteria, edge cases, limits, scope), and drafts `docs/specs/<feature>.md`.
+2. You read it and approve it: `scripts/approve-spec.sh docs/specs/<feature>.md`. The script refuses a spec with no criteria or with unfilled placeholders. Agents cannot run it.
+3. `spec-gate` blocks every code and test edit until the branch has your approval. The approval holds the spec's hash, so if the spec changes, you approve again.
+4. For a change with no behavior to specify: `scripts/approve-spec.sh --no-spec "<reason>"`.
+
+Then the agent builds against it:
 - Each test names the criterion it proves (`AC-2`). Each criterion gets a Verification row in the PR.
-- Every PR that changes code has a `## Spec gaps and assumptions` section. Read it: it lists what the agent decided for you.
-- `pr-gate` blocks a code PR without tests (or a `No-Test-Reason:`), a filled Verification row, a `Spec:` line, or the Spec gaps section.
+- A gap found while coding goes into the spec, which sends it back to you for approval.
+- Every code PR has a `## Spec gaps and assumptions` section listing what the agent decided for you.
+- `pr-gate` blocks a code PR without your approval, tests (or a `No-Test-Reason:`), a filled Verification row, or the Spec gaps section.
 - `test-guard` blocks a `fix:` commit with no test change.
 
-A thin spec still produces passing tests. Write the spec with the agent before the code, and read the Spec gaps section before you merge.
+`scripts/approve-spec.sh --status` shows the approval for the current branch. Commit `.claude/approvals/` with the branch, so reviewers see what you approved.
+
+Autonomous runs cannot get an approval mid-run. Without one, the agent drafts the spec, commits it, and stops with a draft PR for you to approve.
 
 ## Tiers
 
@@ -95,6 +104,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | PreToolUse Edit/Write | `protected-paths` | Blocks secrets, lockfiles, agent settings, git internals, files outside the project |
 | PreToolUse Edit/Write | `secret-write-guard` | Blocks content that contains a credential |
 | PreToolUse Edit/Write | `test-writer-scope` | Blocks the `test-writer` subagent from editing anything but tests and fixtures |
+| PreToolUse Edit/Write | `spec-gate` | Blocks code and test edits until the user has approved the branch's spec and the spec is unchanged since |
 | PostToolUse Edit/Write | `yellow-notice` | Flags a Yellow edit and states the extra duties |
 | PostToolUse Edit/Write | `rules-notice` | Names the `.claude/rules/` file whose `paths:` match the file just written, once per rule per session. Claude Code loads a path-scoped rule only when Claude reads a matching file, never when it creates one |
 | PostToolUse Edit/Write | `format-lint` | Runs the project formatter and linter on the file |
@@ -106,7 +116,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | Skill | Use |
 |---|---|
 | `feature` | The main loop: spec, threat notes, tests, code, self-review, verification, PR |
-| `spec` | Write or tighten the spec: criterion IDs, edge cases, permissions, and the gaps the user must decide |
+| `spec` | Guides the user through writing the spec, section by section, then hands over the approval command |
 | `test-strategy` | Pick test levels (unit, integration, contract, regression, e2e) and set up test tools |
 | `verify-spec` | Drive the running app (headless browser, Android emulator, iOS simulator, CLI, API) and check each acceptance criterion, with evidence |
 | `threat-model` | STRIDE pass, writes `docs/THREAT_MODEL.md` |
@@ -140,6 +150,7 @@ The `test-writer-scope` hook blocks any edit outside test files and fixtures whe
 | `SECURITY.md`, `.claude/pull_request_template.md` | Disclosure policy and a PR template with `Security-Review:` and `Verification` |
 | `scripts/security-check.sh` | Local scans: secret files, gitleaks, semgrep, osv-scanner, trivy. `--staged` and `--changed` modes |
 | `scripts/claude-autonomous.sh` | Starts an unattended run |
+| `scripts/approve-spec.sh` | The user approves the branch's spec. Writes `.claude/approvals/<branch>.json` with the spec's hash. Agents cannot run it |
 | `.githooks/` (`--git-hooks`) | pre-commit and pre-push run `security-check.sh` |
 | `.github/` (GitHub remotes only) | PR template, security workflow, Dependabot |
 
@@ -158,6 +169,7 @@ Set these in the `env` block of the project `.claude/settings.json`.
 | `FW_SECRET_ALLOW` | ERE. Lines that never count as secrets |
 | `FW_TEST_GATE=always`, `FW_SAST=always` | Run those checks in attended sessions too |
 | `FW_TEST_GUARD=off` | Turn off `test-guard` |
+| `FW_SPEC_GATE=off` | Turn off `spec-gate` and the approval check in `pr-gate` |
 | `CLAUDE_TEST_CMD` | The test command for `test-gate`. The default is detected |
 | `CLAUDE_TEST_TIMEOUT`, `CLAUDE_TEST_MAX_ATTEMPTS` | Test gate limits |
 | `FW_SEMGREP_CONFIG` | semgrep rules. The default is `p/default` |
