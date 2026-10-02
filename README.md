@@ -77,11 +77,13 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 |---|---|---|
 | SessionStart | `session-start` | Profile rules, git state, protected-branch warning, detected stack, missing tools |
 | PreToolUse Bash | `bash-guard` | Blocks Red commands in any spelling: `git -C . push origin main`, `bash -c "..."`, `head .env`, `curl \| sh`, deploys, publishes, destructive SQL, `rm -rf` outside the project |
-| PreToolUse Bash | `pr-gate` | `gh pr create`, `glab mr create`, and `tea pr create` need a `Security-Review:` section when the branch touches Yellow paths |
+| PreToolUse Bash | `pr-gate` | `gh pr create`, `glab mr create`, and `tea pr create` need a `Security-Review:` section that names each Yellow file on the branch (or a parent directory with a trailing slash). Empty, "none", and template placeholders do not count |
 | PreToolUse Bash | `test-guard` | Blocks a commit that skips tests or removes assertions (autonomous) |
 | PreToolUse Edit/Write | `protected-paths` | Blocks secrets, lockfiles, agent settings, git internals, files outside the project |
 | PreToolUse Edit/Write | `secret-write-guard` | Blocks content that contains a credential |
+| PreToolUse Edit/Write | `test-writer-scope` | Blocks the `test-writer` subagent from editing anything but tests and fixtures |
 | PostToolUse Edit/Write | `yellow-notice` | Flags a Yellow edit and states the extra duties |
+| PostToolUse Edit/Write | `rules-notice` | Names the `.claude/rules/` file whose `paths:` match the file just written, once per rule per session. Claude Code loads a path-scoped rule only when Claude reads a matching file, never when it creates one |
 | PostToolUse Edit/Write | `format-lint` | Runs the project formatter and linter on the file |
 | Stop | `diff-scan` | Secret scan (gitleaks or built-in patterns) on changed files; semgrep in autonomous runs |
 | Stop | `test-gate` | Runs the tests before the agent may stop (autonomous) |
@@ -110,12 +112,14 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 
 `security-reviewer` (read-only), `test-writer` (test files only), `architect` (read-only).
 
+The `test-writer-scope` hook blocks any edit outside test files and fixtures when the caller is `test-writer`. Claude Code names the subagent (`agent_type`) in the hook input. The hook is wired in the project settings, because hooks in an agent's frontmatter did not run in testing. The read-only limits of the other two come from their tool lists and prompts.
+
 ### Settings and other files
 
 | File | Content |
 |---|---|
 | `.claude/settings.json` | Base permissions, hook wiring, and stack overlays |
-| `.claude/settings.autonomous.json` | The same, plus the autonomous profile and cloud CLI denies |
+| `.claude/settings.autonomous.json` | The autonomous profile and cloud CLI denies, passed with `--settings` on top of `settings.json`. Claude Code combines permission lists across settings files. Generated: a re-run replaces it |
 | `.claude/rules/*.md` | Security, auth, API, backend, frontend, data, mobile, CLI, testing, agentic verification, dependencies, CI/CD, logging |
 | `.claude/output-styles/` | Terse (attended) and Autonomous (unattended) |
 | `CLAUDE.md` | Project template under 100 lines |
@@ -158,8 +162,8 @@ Set these in the `env` block of the project `.claude/settings.json`.
 
 | Platform | Hooks, skills, settings | Sandbox overlay |
 |---|---|---|
-| Linux | Yes | Yes, needs bubblewrap |
-| WSL2 | Yes. Keep repos on the Linux filesystem | Yes, needs bubblewrap |
+| Linux | Yes | Yes, needs bubblewrap and socat |
+| WSL2 | Yes. Keep repos on the Linux filesystem | Yes, needs bubblewrap and socat |
 | WSL1 | Yes | No |
 | macOS | Yes | Yes |
 | Claude Desktop, Code tab | Yes, same `~/.claude` and `.claude/` | Same as the host |
@@ -175,7 +179,8 @@ Hooks are bash scripts that run through `bash` explicitly, so a zsh login shell 
 - Hooks do not isolate the agent. A process can still write a script file and run it, and no hook reads that file. Turn on the `sandbox` overlay where it is available, and keep production credentials off the machine.
 - `bash-guard` matches patterns and does not fully parse shell. `.claude/framework/tests/hooks-test.sh` lists each spelling it blocks.
 - A skill with the same name in `~/.claude/skills/` may shadow the project's copy. Remove or rename the personal copy if they differ.
-- Path-scoped rules in `.claude/rules/` may not load on their own in every Claude Code version. `CLAUDE.md` tells the agent to read the matching file before it changes an area.
+- Without bubblewrap or socat, Claude Code runs commands unsandboxed. The `sandbox` overlay sets `sandbox.failIfUnavailable`, so Claude Code refuses to start instead, and `session-start` names the missing tool.
+- Claude Code loads a path-scoped rule only when Claude reads a matching file. `rules-notice` names the rule on each write, and `CLAUDE.md` tells the agent to read the matching file first. Rules that must always apply belong in a file without `paths:`, like `security.md`.
 
 ## Development
 

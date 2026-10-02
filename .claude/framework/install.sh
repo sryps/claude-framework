@@ -10,7 +10,7 @@
 #
 # It writes:
 #   .claude/settings.json             base + hook wiring + overlays, merged into any existing file
-#   .claude/settings.autonomous.json  the above + autonomous profile + cloud overlay
+#   .claude/settings.autonomous.json  autonomous profile + cloud overlay, used on top of settings.json
 #   .claude/{hooks,skills,agents,rules,output-styles,framework}/   (existing project only)
 #   scripts/security-check.sh, scripts/claude-autonomous.sh, .githooks/
 #   CLAUDE.md, SECURITY.md, .claude/pull_request_template.md   only when absent
@@ -230,9 +230,10 @@ fi
 install_json "$existing" "$tmp/settings.json"
 
 if [ "$autonomous" = 1 ]; then
-  # Passed with --settings. It repeats the full deny list, so it is safe
-  # whether or not Claude Code merges arrays across settings files.
-  auto_layers="$tmp/settings.json $FWD/settings/autonomous.json"
+  # Passed with --settings on top of the project settings. Claude Code
+  # combines permission lists across settings files, so this file holds only
+  # the autonomous additions. It is generated: re-running replaces it.
+  auto_layers="$FWD/settings/autonomous.json"
   case ",$overlays," in *,cloud,*) ;; *) auto_layers="$auto_layers $FWD/settings/overlays/cloud.json" ;; esac
   # shellcheck disable=SC2086
   merge_json $auto_layers >"$tmp/autonomous.json"

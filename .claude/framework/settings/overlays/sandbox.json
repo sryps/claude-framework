@@ -1,6 +1,7 @@
 {
   "sandbox": {
     "enabled": true,
+    "failIfUnavailable": true,
     "filesystem": {
       "denyRead": [
         "~/.ssh",

@@ -44,14 +44,69 @@ if [ -n "$bf" ] && [ "$bf" != "-" ] && [ -f "$bf" ]; then
   body=$(cat "$bf")
 fi
 
+how_to="Add a section like this to the body, then run the command again:
+
+Security-Review:
+- <file or directory/>: <risk you checked> -> <how the change handles it, with the test name>
+
+Name each Yellow file, or a directory that holds it (for example .claude/skills/).
+Write the body to a file and pass --body-file, so the section survives shell quoting."
+
 if ! printf '%s' "$body" | grep -q 'Security-Review:'; then
   fw_block "Blocked by pr-gate: this branch changes Yellow-tier files, and the PR body has no 'Security-Review:' section.
 Yellow files on this branch:$yellow
-Add a section like this to the body, then run the command again:
+$how_to"
+fi
 
-Security-Review:
-- <file>: <risk you checked> -> <how the change handles it, with the test name>
+# The section runs from the marker to the next markdown heading. HTML
+# comments (the template's instructions) do not count.
+section=$(printf '%s\n' "$body" | awk '
+  {
+    line = $0
+    if (incomment) {
+      e = index(line, "-->")
+      if (!e) next
+      line = substr(line, e + 3); incomment = 0
+    }
+    while ((s = index(line, "<!--")) > 0) {
+      e = index(substr(line, s), "-->")
+      if (e > 0) line = substr(line, 1, s - 1) substr(line, s + e + 2)
+      else { line = substr(line, 1, s - 1); incomment = 1; break }
+    }
+  }
+  insec && line ~ /^#+[ \t]/ { exit }
+  insec { print line; next }
+  (p = index(line, "Security-Review:")) > 0 {
+    insec = 1
+    rest = substr(line, p + 16)
+    if (rest ~ /[^ \t]/) print rest
+  }')
+# Placeholders and "none" are not a review.
+content=$(printf '%s\n' "$section" | grep -vE '<[A-Za-z][^>]*>|\{\{' | grep -viE '^[[:space:]]*([-*][[:space:]]*)?(none|n/a|tbd|todo)?[[:space:]]*\.?[[:space:]]*$' || true)
+if [ -z "$content" ]; then
+  fw_block "Blocked by pr-gate: the 'Security-Review:' section is empty, says none, or still holds the template placeholders, but this branch changes Yellow-tier files.
+Yellow files on this branch:$yellow
+$how_to"
+fi
 
-Write the body to a file and pass --body-file, so the section survives shell quoting."
+missing=""
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  # The file itself, or any parent directory written with a trailing slash.
+  covered=0
+  printf '%s' "$content" | grep -qF -- "$f" && covered=1
+  d=$f
+  while [ "$covered" = 0 ]; do
+    case "$d" in */*) d=${d%/*} ;; *) break ;; esac
+    printf '%s' "$content" | grep -qF -- "$d/" && covered=1
+  done
+  [ "$covered" = 1 ] || missing="$missing
+- $f"
+done <<EOF2
+$(printf '%s\n' "$yellow" | sed -nE 's/^- (.*) \([^)]*\)$/\1/p')
+EOF2
+if [ -n "$missing" ]; then
+  fw_block "Blocked by pr-gate: the 'Security-Review:' section does not name these Yellow files:$missing
+$how_to"
 fi
 exit 0

@@ -111,9 +111,37 @@ mask_messages() {
 }
 scan=$(printf '%s\n' "$cmd" | strip_heredocs | mask_messages)
 
-# Normalize: newlines, `&&`, `||`, `;`, `|`, `&`, `$(`, and backticks start a new segment.
-segments=$(printf '%s\n' "$scan" | sed -E 's/([&][&]|[|][|]|[;]|[|]|[&]|[$][(]|`|[(]|[)])/\
-/g')
+# Split into segments, one command each. Outside quotes, newlines, `;`, `|`,
+# `&`, parentheses, `$(`, and backticks start a new segment. Inside single
+# quotes nothing splits: the text is an argument. Inside double quotes only
+# `$(...)` and backticks split, because they run.
+split_segments() {
+  awk '
+    BEGIN { RS = "\001"; ORS = "" }
+    {
+      s = $0; n = length(s); q = ""; sub_depth = 0; out = ""
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1)
+        if (q == "\047") { if (c == "\047") q = ""; out = out c; continue }
+        if (q == "\"") {
+          if (c == "\\") { out = out c substr(s, i + 1, 1); i++; continue }
+          if (c == "$" && substr(s, i + 1, 1) == "(") { out = out "\n"; sub_depth++; i++; continue }
+          if (c == ")" && sub_depth > 0) { out = out "\n"; sub_depth--; continue }
+          if (c == "`") { out = out "\n"; continue }
+          if (c == "\"" && sub_depth == 0) q = ""
+          out = out c
+          continue
+        }
+        if (c == "\047" || c == "\"") { q = c; out = out c; continue }
+        if (c == "\\") { out = out c substr(s, i + 1, 1); i++; continue }
+        if (c == "$" && substr(s, i + 1, 1) == "(") { out = out "\n"; i++; continue }
+        if (index(";|&()`\n", c)) { out = out "\n"; continue }
+        out = out c
+      }
+      print out "\n"
+    }'
+}
+segments=$(printf '%s\n' "$scan" | split_segments)
 
 # Whole-string checks first. These span segments.
 if printf '%s' "$scan" | grep -qE "(curl|wget|fetch|iwr|Invoke-WebRequest)${FW_E}[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|k|fi)?sh${FW_E}"; then
@@ -310,14 +338,14 @@ done <<EOF
 $segments
 EOF
 
-# Nested shells: check the inner command string too.
-inner=$(printf '%s' "$cmd" | sed -nE "s/.*(bash|sh|zsh|dash)[[:space:]]+-[a-z]*c[[:space:]]+[\"']([^\"']*)[\"'].*/\2/p" | head -1)
-if [ -n "$inner" ] && [ "$inner" != "$cmd" ]; then
+# Nested shells: check every quoted command string handed to a shell or eval.
+inner=$(printf '%s\n' "$scan" | grep -oE "(^|[^A-Za-z0-9_])((ba|z|da|k)?sh[[:space:]]+-[a-z]*c|eval)[[:space:]]+(\"[^\"]*\"|'[^']*')" \
+  | sed -E "s/^.*[[:space:]]([\"'])(.*)[\"']$/\2/")
+if [ -n "$inner" ]; then
   while IFS= read -r seg; do
     check_segment "$seg"
   done <<EOF
-$(printf '%s\n' "$inner" | sed -E 's/([&][&]|[|][|]|[;]|[|]|[&])/\
-/g')
+$(printf '%s\n' "$inner" | split_segments)
 EOF
 fi
 exit 0

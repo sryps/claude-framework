@@ -212,6 +212,18 @@ allow "grep -n deny .claude/settings.json"
 allow "git check-ignore -q .claude/settings.local.json"
 allow "git blame .claude/hooks/bash-guard.sh"
 
+# Quote-aware splitting.
+allow "jq -c '{deny: (.permissions.deny|length), hooks: has(\"hooks\")}' .claude/settings.json"
+allow "grep -E 'a|b;c' README.md"
+allow "echo 'rm -rf /; git push origin main'"
+allow "cat > t.py <<'EOF'${NL}run(\"eval 'git push origin main'\")${NL}EOF"
+block "eval 'git push origin main'"
+block "eval \"git reset --hard\""
+block "sh -c 'echo ok' && bash -c 'git push --force'"
+block "echo \"\$(cat .env)\""
+block "echo \"\$(git push origin main)\""
+block "(cd sub; git push origin main)"
+
 # Framework guard files.
 block "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
 block "rm .claude/framework/install.sh"
@@ -285,6 +297,24 @@ case "$name" in *"$FILTER"*)
 esac
 block "rm -rf $REPO"
 
+# --- test-writer-scope ---
+tw() { expect "test-writer-scope $1: $2" "$3" test-writer-scope "$(json_write "$REPO/$2" x | jq '. + {agent_id: "a1", agent_type: "test-writer"}')"; }
+expect "test-writer-scope main agent unaffected" 0 test-writer-scope "$(json_write "$REPO/src/auth/login.ts" x)"
+expect "test-writer-scope other subagent unaffected" 0 test-writer-scope "$(json_write "$REPO/src/auth/login.ts" x | jq '. + {agent_id: "a2", agent_type: "architect"}')"
+tw allow src/auth/login.test.ts 0
+tw allow tests/api/users_test.py 0
+tw allow src/__tests__/a.tsx 0
+tw allow e2e/login.spec.ts 0
+tw allow pkg/user/user_test.go 0
+tw allow tests/fixtures/user.json 0
+tw allow .maestro/login.yaml 0
+tw allow app/src/test/java/AuthTest.java 0
+tw allow conftest.py 0
+tw block src/auth/login.ts 2
+tw block package.json 2
+tw block src/testing-utils.ts 2
+tw block .claude/rules/testing.md 2
+
 # --- secret-write-guard ---
 sw() { expect "secret-write-guard $1: $2" "$3" secret-write-guard "$(json_write "$REPO/src/x.ts" "$4")"; }
 sw block aws 2 "const k = \"$K_AWS\";"
@@ -318,6 +348,33 @@ yn deps "$REPO/package.json" "dependency"
 yn green "$REPO/src/components/Button.tsx" ""
 yn agent "$REPO/.claude/rules/api.md" "agent instructions"
 
+# --- rules-notice ---
+mkdir -p "$REPO/.claude/rules"
+printf -- '---\npaths:\n  - "**/auth/**"\n  - "**/*session*"\n---\n# auth\n' > "$REPO/.claude/rules/auth.md"
+printf -- '---\npaths: ["src/ui/**/*.{ts,tsx}", "**/*.css"]\n---\n# ui\n' > "$REPO/.claude/rules/frontend.md"
+printf -- '# always loaded, no paths\n' > "$REPO/.claude/rules/security.md"
+rn() {
+  local name="rules-notice $1"
+  case "$name" in *"$FILTER"*) ;; *) return ;; esac
+  out=$(jq -n --arg p "$REPO/$2" --arg cwd "$REPO" --arg sid "$4" --arg aid "${5:-}" '{session_id:$sid,cwd:$cwd,tool_name:"Write",tool_input:{file_path:$p,content:"x"}} + (if $aid == "" then {} else {agent_id:$aid, agent_type:"test-writer"} end)' | bash "$HOOKS/rules-notice.sh" 2>/dev/null)
+  if { [ -z "$3" ] && [ -z "$out" ]; } || { [ -n "$3" ] && printf '%s' "$out" | grep -q -- "$3"; }; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: want '$3', got: $(printf '%s' "$out" | head -c 200)"; fi
+}
+rn "nested match" "src/auth/login.ts" "rules/auth.md" r1
+rn "once per session" "src/auth/other.ts" "" r1
+rn "new session again" "src/auth/other.ts" "rules/auth.md" r2
+rn "root-level ** match" "auth/x.go" "rules/auth.md" r3
+rn "star in name" "lib/user_session_store.py" "rules/auth.md" r4
+rn "inline list and braces" "src/ui/forms/Button.tsx" "rules/frontend.md" r5
+rn "brace miss" "src/ui/forms/Button.js" "" r6
+rn "css anywhere" "styles/main.css" "rules/frontend.md" r7
+rn "no paths rule not named" "src/lib/math.ts" "" r8
+rn "two rules at once" "src/ui/auth/LoginForm.tsx" "rules/auth.md .claude/rules/frontend.md" r9
+rn "subagent sees the rule" "src/auth/a.test.ts" "rules/auth.md" r10 sub1
+rn "subagent once" "src/auth/b.test.ts" "" r10 sub1
+rn "main agent not muted by subagent" "src/auth/session.ts" "rules/auth.md" r10
+rm -rf "$REPO/.claude/rules"
+
 # --- pr-gate ---
 mkdir -p "$REPO/src/auth"
 echo "export const x = 1" > "$REPO/src/auth/login.ts"
@@ -329,7 +386,19 @@ mkdir -p "$REPO/.claude/runs" && cp "$TMP/body.md" "$REPO/.claude/runs/pr-body.m
 expect "pr-gate allow relative body file" 0 pr-gate "$(json_bash "gh pr create --title t --body-file .claude/runs/pr-body.md")"
 cp "$TMP/body.md" "$TMP/pr-body.md"
 expect "pr-gate allow TMPDIR body file" 0 pr-gate "$(json_bash 'gh pr create --title t --body-file "${TMPDIR:-/tmp}/pr-body.md"')"
-expect "pr-gate allow inline" 0 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: ok'")"
+expect "pr-gate block vague inline" 2 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: ok'")"
+expect "pr-gate allow inline naming file" 0 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src/auth/login.ts checked, deny test added'")"
+expect "pr-gate allow parent directory" 0 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src/auth/ reviewed for IDOR'")"
+expect "pr-gate block bare parent without slash" 2 pr-gate "$(json_bash "gh pr create --title t --body 'Security-Review: src reviewed'")"
+printf '## Security-Review:\n\n<!--\n- src/auth/login.ts: hidden in a comment\n-->\n- none\n\n## Decisions\n- src/auth/login.ts named outside the section\n' > "$TMP/tpl.md"
+expect "pr-gate block template left as is" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/tpl.md")"
+printf 'Security-Review:\n- <file>: <risk you checked> -> <how>\n' > "$TMP/ph.md"
+expect "pr-gate block placeholder" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/ph.md")"
+mkdir -p "$REPO/supabase/migrations" && echo "create table t();" > "$REPO/supabase/migrations/001.sql" && git add -A && git commit -qm mig
+expect "pr-gate block when one yellow file is missing" 2 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/body.md")"
+printf 'Security-Review:\n- src/auth/login.ts: checked\n- supabase/migrations/001.sql: RLS on, policy test added\n' > "$TMP/body2.md"
+expect "pr-gate allow when every yellow file is named" 0 pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/body2.md")"
+cp "$TMP/body2.md" "$TMP/body.md"; cp "$TMP/body2.md" "$TMP/pr-body.md"; cp "$TMP/body2.md" "$REPO/.claude/runs/pr-body.md"
 expect "pr-gate glab block without section" 2 pr-gate "$(json_bash "glab mr create --title t --description 'no review'")"
 expect "pr-gate glab allow cat body" 0 pr-gate "$(json_bash 'glab mr create --title t --description "$(cat .claude/runs/pr-body.md)"')"
 expect "pr-gate tea block without section" 2 pr-gate "$(json_bash "tea pr create --title t --description x")"
