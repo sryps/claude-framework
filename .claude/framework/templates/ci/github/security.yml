@@ -91,13 +91,19 @@ jobs:
         id: graph
         env:
           GH_TOKEN: ${{ github.token }}
+        # Only a 404 means the graph is off. Any other error (rate limit,
+        # outage, token problem) fails the job instead of skipping the review.
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/dependency-graph/sbom" --silent 2>/dev/null; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Dependency review skipped::The dependency graph is off for this repository (Settings > Code security). osv-scanner still checks dependencies."
-          fi
+          status=$(gh api -i "repos/$GITHUB_REPOSITORY/dependency-graph/sbom" 2>/dev/null | head -1 | awk '{print $2}')
+          case "$status" in
+            200) echo "enabled=true" >> "$GITHUB_OUTPUT" ;;
+            404)
+              echo "enabled=false" >> "$GITHUB_OUTPUT"
+              echo "::notice title=Dependency review skipped::The dependency graph is off for this repository (Settings > Code security). osv-scanner still checks dependencies." ;;
+            *)
+              echo "::error title=Dependency graph check failed::GitHub API returned '${status:-no response}'. Not skipping dependency review on an unknown state."
+              exit 1 ;;
+          esac
       - if: steps.graph.outputs.enabled == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
