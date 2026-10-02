@@ -75,6 +75,9 @@ jobs:
         --recursive
         ./
 
+  # Needs the repository's dependency graph: Settings > Code security >
+  # Dependency graph. Without it this job fails with "Dependency review is
+  # not supported on this repository". osv-scanner covers the same CVEs.
   dependency-review:
     name: dependency review
     if: github.event_name == 'pull_request'
