@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Scan staged changes for secrets before each commit.
+# Installed by the framework install.sh --git-hooks.
+root=$(git rev-parse --show-toplevel) || exit 1
+[ -x "$root/scripts/security-check.sh" ] || exit 0
+exec bash "$root/scripts/security-check.sh" --staged

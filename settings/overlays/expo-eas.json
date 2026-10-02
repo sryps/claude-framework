@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo install *)",
+      "Bash(npx expo-doctor*)",
+      "Bash(npx expo export*)"
+    ],
+    "deny": [
+      "Bash(eas *)",
+      "Bash(npx eas *)",
+      "Bash(npx eas-cli *)",
+      "Bash(make build-prod*)",
+      "Bash(make submit*)",
+      "Bash(make preview*)",
+      "Bash(make ios-build-prod*)",
+      "Bash(make ios-submit*)",
+      "Bash(make ios-preview*)",
+      "Bash(fastlane *)",
+      "Read(**/credentials.json)",
+      "Read(**/*.mobileprovision)"
+    ]
+  }
+}

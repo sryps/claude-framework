@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "outputStyle": "Autonomous",
+  "env": {
+    "CLAUDE_PROFILE": "autonomous",
+    "CLAUDE_TEST_TIMEOUT": "900",
+    "CLAUDE_TEST_MAX_ATTEMPTS": "8"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin HEAD:master*)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin master*)",
+      "Bash(gh api * /merge*)",
+      "Bash(gh pr review * --approve*)",
+      "Bash(gh workflow run*)",
+      "Bash(make release*)",
+      "Bash(make deploy*)",
+      "Bash(make *-deploy*)",
+      "Bash(make publish*)",
+      "Bash(npm install -g*)",
+      "Bash(npm i -g*)",
+      "Bash(brew install*)",
+      "Bash(* --db-url*)",
+      "Bash(* --linked*)"
+    ]
+  }
+}

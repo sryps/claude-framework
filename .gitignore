@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.vuln-scan/
+.claude/settings.local.json
+.claude/runs/
+*.bak
+.DS_Store

@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(terraform fmt*)", "Bash(terraform validate*)", "Bash(terraform init -backend=false*)", "Bash(tflint*)", "Bash(checkov*)", "Bash(tfsec*)"],
+    "deny": ["Bash(terraform apply*)", "Bash(terraform destroy*)", "Bash(terraform import*)", "Bash(terraform state*)", "Bash(terraform taint*)", "Bash(terraform force-unlock*)", "Bash(tofu apply*)", "Bash(tofu destroy*)", "Bash(terragrunt apply*)", "Bash(terragrunt destroy*)", "Bash(pulumi up*)", "Bash(pulumi destroy*)", "Read(**/*.tfstate)", "Read(**/*.tfstate.backup)", "Read(**/*.tfvars)"]
+  }
+}
