@@ -175,3 +175,7 @@ make test            # hook and installer tests only
 `verify.sh` prints SKIP, not PASS, for any check whose tool is missing (shellcheck, the claude CLI, docker). Run it on macOS and on Linux before a release. `.github/workflows/test.yml` is an optional wrapper that runs the same script.
 
 Test a local checkout as a plugin: `./install.sh --plugin-local <project>`, then `claude plugin marketplace add "$PWD"`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

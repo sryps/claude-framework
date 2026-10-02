@@ -9,5 +9,6 @@
     "autonomous",
     "hooks",
     "skills"
-  ]
+  ],
+  "license": "MIT"
 }
