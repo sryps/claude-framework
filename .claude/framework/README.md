@@ -144,7 +144,7 @@ Set these in the `env` block of the project `.claude/settings.json`.
 | `FW_SEMGREP_CONFIG` | semgrep rules. The default is `p/default` |
 | `FW_FORMAT_LINT=off` | Turn off `format-lint` |
 | `FW_SESSION_GIT=0`, `FW_SESSION_TOOLS=0` | Hide those sections of the session context |
-| `FW_MAINTAINER=1` | Framework development only. Hooks, `.claude/framework/`, and git hooks become Yellow. Set it by hand in `.claude/settings.local.json` |
+| `FW_MAINTAINER=1` | Framework development only. Hooks, `.claude/framework/`, and git hooks become Yellow. Set it by hand in `.claude/settings.local.json`. The hooks read that file, not the environment, so the flag does not leak into a `claude` run in another project. The autonomous profile ignores it |
 
 ### What an agent may change in `.claude/`
 

@@ -6,9 +6,23 @@
 #   FW_RED_PATHS_EXTRA     ERE, matched against the repo-relative path
 #   FW_YELLOW_PATHS_EXTRA  ERE, matched against the repo-relative path
 #   FW_SECRET_ALLOW        ERE, a matching line is never reported as a secret
-#   FW_MAINTAINER=1        framework development only: hooks, framework, and
-#                          git hook files become Yellow instead of Red.
-#                          Set it by hand in .claude/settings.local.json.
+#
+# Maintainer mode (framework development only) makes hooks, framework, and
+# git hook files Yellow instead of Red. Set "FW_MAINTAINER": "1" in the env
+# block of .claude/settings.local.json by hand. The hooks read that file, not
+# the environment, so the flag never leaks into a claude process started in
+# another project. The autonomous profile ignores it.
+
+fw_maintainer() {
+  local f="$FW_ROOT/.claude/settings.local.json"
+  fw_autonomous && return 1
+  [ -f "$f" ] || return 1
+  if [ "$FW_HAS_JQ" = 1 ]; then
+    jq -e '.env.FW_MAINTAINER == "1" or .env.FW_MAINTAINER == 1' "$f" >/dev/null 2>&1
+  else
+    grep -qE '"FW_MAINTAINER"[[:space:]]*:[[:space:]]*"?1"?' "$f"
+  fi
+}
 
 # Secret files. Templates (.env.example and similar) stay editable.
 FW_SECRET_FILE_RE='(^|/)\.env($|\.)|(^|/)\.envrc$|\.(pem|key|p8|p12|pfx|keystore|jks|mobileprovision)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|(^|/)\.netrc$|(^|/)\.npmrc$|(^|/)\.pypirc$|(^|/)credentials(\.json)?$|(^|/)service-account[^/]*\.json$|(^|/)google-services[^/]*\.json$|(^|/)GoogleService-Info[^/]*\.plist$|(^|/)\.ssh/|(^|/)\.aws/|(^|/)\.config/gh/|(^|/)\.kube/config$|(^|/)\.docker/config\.json$|(^|/)\.git-credentials$'
@@ -113,7 +127,7 @@ fw_path_tier() {
   if fw_is_secret_path "$rel"; then echo "red secret or credential file"; return; fi
   if printf '%s' "$rel" | grep -qE "$FW_CONTROL_RE"; then echo "red agent control file (settings, git internals, MCP config)"; return; fi
   if printf '%s' "$rel" | grep -qE "$FW_GUARD_RE"; then
-    if [ "${FW_MAINTAINER:-}" = 1 ]; then echo "yellow framework guard file (maintainer mode)"; return; fi
+    if fw_maintainer; then echo "yellow framework guard file (maintainer mode)"; return; fi
     echo "red framework guard file (hooks, framework scripts, git hooks)"; return
   fi
   if printf '%s' "$rel" | grep -qE "$FW_LOCKFILE_RE"; then echo "red lockfile; regenerate it with the package manager instead of editing it"; return; fi

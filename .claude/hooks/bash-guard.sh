@@ -159,7 +159,7 @@ check_segment() {
 
   # --- agent control files ---
   guard_re='\.claude/settings[^[:space:]]*\.json|\.git/hooks/|core\.hooksPath'
-  [ "${FW_MAINTAINER:-}" = 1 ] || guard_re="$guard_re|\.claude/hooks/|\.claude/framework/|\.githooks/"
+  fw_maintainer || guard_re="$guard_re|\.claude/hooks/|\.claude/framework/|\.githooks/"
   if printf '%s' "$s" | grep -qE "$guard_re"; then
     # Reading is fine. So is running the framework's own checks. A write
     # redirect or an in-place flag makes it a write.

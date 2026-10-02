@@ -221,10 +221,22 @@ allow "bash .claude/framework/verify.sh"
 allow ".claude/framework/verify.sh --quick"
 allow "bash .claude/framework/tests/hooks-test.sh bash-guard"
 allow "cat .claude/hooks/bash-guard.sh"
-export FW_MAINTAINER=1
+mkdir -p "$REPO/.claude"; printf '{"env":{"FW_MAINTAINER":"1"}}' > "$REPO/.claude/settings.local.json"
 allow "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
 block "sed -i 's/x/y/' .claude/settings.json"
+rm -f "$REPO/.claude/settings.local.json"
+
+# Maintainer mode comes from the project file, never from the environment.
+export FW_MAINTAINER=1
+block "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
+expect "protected-paths env flag alone does nothing" 2 protected-paths "$(json_write "$REPO/.claude/hooks/x.sh" x)"
 unset FW_MAINTAINER
+mkdir -p "$REPO/.claude"; printf '{"env":{"FW_MAINTAINER":"1"}}' > "$REPO/.claude/settings.local.json"
+export CLAUDE_PROFILE=autonomous
+block "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
+expect "protected-paths autonomous ignores maintainer mode" 2 protected-paths "$(json_write "$REPO/.claude/hooks/x.sh" x)"
+unset CLAUDE_PROFILE
+rm -f "$REPO/.claude/settings.local.json"
 
 # Escape hatch.
 export FW_GUARD_ALLOW='^make deploy-staging$'
@@ -248,10 +260,10 @@ pp allow "$REPO/.claude/skills/feature/SKILL.md" 0
 pp allow "$REPO/.claude/rules/api.md" 0
 pp allow "$REPO/scripts/seed.sh" 0
 pp allow "$REPO/CLAUDE.md" 0
-export FW_MAINTAINER=1
+mkdir -p "$REPO/.claude"; printf '{"env":{"FW_MAINTAINER":"1"}}' > "$REPO/.claude/settings.local.json"
 pp allow "$REPO/.claude/hooks/bash-guard.sh" 0
 pp block "$REPO/.claude/settings.json" 2
-unset FW_MAINTAINER
+rm -f "$REPO/.claude/settings.local.json"
 pp block "$REPO/package-lock.json" 2
 pp block "$REPO/certs/server.pem" 2
 pp block "/etc/hosts" 2
