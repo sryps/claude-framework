@@ -16,7 +16,7 @@ path=$(fw_get '.tool_input.file_path // .tool_input.notebook_path')
 tier=$(fw_path_tier "$path")
 case "$tier" in yellow*) ;; *) exit 0 ;; esac
 reason=${tier#yellow }
-rel=$(fw_relpath "$(fw_abspath "$path")")
+rel=$(fw_project_rel "$path")
 
 state=$(fw_state_dir)
 printf '%s\t%s\n' "$reason" "$rel" >>"$state/yellow.log"

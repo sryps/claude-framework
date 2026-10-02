@@ -28,6 +28,9 @@ fw_maintainer() {
 FW_SECRET_FILE_RE='(^|/)\.env($|\.)|(^|/)\.envrc$|\.(pem|key|p8|p12|pfx|keystore|jks|mobileprovision)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|(^|/)\.netrc$|(^|/)\.npmrc$|(^|/)\.pypirc$|(^|/)credentials(\.json)?$|(^|/)service-account[^/]*\.json$|(^|/)google-services[^/]*\.json$|(^|/)GoogleService-Info[^/]*\.plist$|(^|/)\.ssh/|(^|/)\.aws/|(^|/)\.config/gh/|(^|/)\.kube/config$|(^|/)\.docker/config\.json$|(^|/)\.git-credentials$'
 FW_SECRET_TEMPLATE_RE='\.(example|sample|template|dist|defaults)(\.[A-Za-z0-9]+)?$'
 
+# Test files, fixtures, and test setup. Used by test-writer-scope.sh.
+FW_TEST_PATH_RE='(^|/)(__tests__|__mocks__|__snapshots__|__fixtures__|tests?|specs?|e2e|cypress|playwright|\.maestro|testdata|fixtures)/|\.(test|spec)\.[A-Za-z0-9]+$|_test\.(go|py|ts|js|rb|exs?)$|(^|/)test_[^/]*\.py$|[A-Za-z0-9](Test|Tests|Spec)\.(swift|kt|java|cs|scala)$|(^|/)(conftest\.py|(jest|vitest)\.setup\.[cm]?[jt]s|playwright\.config\.[cm]?[jt]s)$'
+
 FW_LOCKFILE_RE='(^|/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|pubspec\.lock|flake\.lock)$'
 
 # Files that control the agent itself. An agent that edits these can turn off
@@ -87,6 +90,17 @@ fw_physpath() {
   dir=$(cd "$dir" 2>/dev/null && pwd -P) || { printf '%s' "$abs"; return; }
   [ "$dir" = / ] && dir=""
   printf '%s' "$dir$rest"
+}
+
+# fw_project_rel <path>. Repo-relative path, also when the path and FW_ROOT
+# reach the same place through different symlinks. Absolute when outside.
+fw_project_rel() {
+  local abs p r
+  abs=$(fw_abspath "$1")
+  case "$abs" in "$FW_ROOT"/*) printf '%s' "${abs#"$FW_ROOT"/}"; return ;; esac
+  p=$(fw_physpath "$abs")
+  r=$(fw_physpath "$FW_ROOT")
+  case "$p" in "$r"/*) printf '%s' "${p#"$r"/}" ;; *) printf '%s' "$abs" ;; esac
 }
 
 # fw_same_path <a> <b>. True when both name the same path, lexically or

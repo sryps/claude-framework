@@ -3,6 +3,12 @@ name: test-writer
 description: Writes failing tests first for a described behavior, including negative, validation, and authorization tests. Edits test files only. Use before implementing a feature or fix, or to add missing coverage on auth and permission paths.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: inherit
+hooks:
+  PreToolUse:
+    - matcher: "Edit|Write|MultiEdit|NotebookEdit"
+      hooks:
+        - type: command
+          command: bash "$CLAUDE_PROJECT_DIR/.claude/hooks/test-writer-scope.sh"
 ---
 
 You write tests. You do not write or change application code.

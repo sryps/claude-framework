@@ -93,6 +93,20 @@ if [ "${FW_SESSION_TOOLS:-1}" != 0 ]; then
   missing=""
   for t in jq git gitleaks; do fw_have "$t" || missing="$missing $t"; done
   if fw_autonomous; then fw_have semgrep || missing="$missing semgrep"; fi
+  # The Linux sandbox needs bubblewrap and socat. Without them Claude Code
+  # runs commands unsandboxed unless sandbox.failIfUnavailable is set.
+  if [ "$(uname -s)" = Linux ] && [ "$FW_HAS_JQ" = 1 ] && \
+     jq -e '.sandbox.enabled == true' "$FW_ROOT/.claude/settings.json" >/dev/null 2>&1; then
+    sbx=""
+    fw_have bwrap || sbx="$sbx bubblewrap"
+    fw_have socat || sbx="$sbx socat"
+    if [ -n "$sbx" ]; then
+      missing="$missing$sbx"
+      add ""
+      add "## Sandbox is enabled but$sbx is missing
+Commands run without the sandbox unless sandbox.failIfUnavailable is true. Tell the user to install it: sudo apt install$sbx."
+    fi
+  fi
   if [ -n "$missing" ]; then
     add ""
     add "## Missing tools:$missing"

@@ -1,6 +1,14 @@
 # Claude framework plan
 
-Status: v0.1 is built. README.md describes what shipped. The plugin is named `agent-guardrails`, because Claude Code reserves the `claude-` prefix.
+Status: superseded. This is the original plan, kept for history. README.md describes what shipped.
+
+What changed after this plan:
+- Everything lives in the project's `.claude/` directory. There is no plugin. Fork the repo, or run `.claude/framework/install.sh` against an existing project.
+- Verification is local (`.claude/framework/verify.sh`). GitHub workflows are optional and written only for GitHub remotes.
+- The framework sets no repository settings (branch rules, dependency graph, template flag). Projects keep their own.
+- Path-scoped rules (`paths:` frontmatter) load only when Claude reads a matching file, and not when it creates one. A hook names the matching rules file on each write.
+- The Linux sandbox needs both bubblewrap and socat. Without them, Claude Code runs commands unsandboxed. The sandbox overlay sets `sandbox.failIfUnavailable`, so Claude Code refuses to start instead.
+- Permission lists combine across settings scopes, with duplicates removed. The autonomous settings file holds only the autonomous additions.
 
 A reusable set of rules, settings, hooks, skills, and agents for building production software with autonomous Claude Code agents. Works for web apps, mobile apps, services, and binaries.
 

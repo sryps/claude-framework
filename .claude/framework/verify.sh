@@ -46,7 +46,11 @@ check_settings() {
   if [ -z "$missing" ]; then pass "$f"; else fail "$f is missing:"; printf '  %s\n' "$missing"; fi
 }
 if [ -f .claude/settings.json ]; then check_settings .claude/settings.json; else fail ".claude/settings.json is missing. Run $FWD/install.sh"; fi
-[ -f .claude/settings.autonomous.json ] && check_settings .claude/settings.autonomous.json
+if [ -f .claude/settings.autonomous.json ]; then
+  [ "$(jq -r '.env.CLAUDE_PROFILE // empty' .claude/settings.autonomous.json)" = autonomous ] \
+    && pass ".claude/settings.autonomous.json sets the autonomous profile" \
+    || fail ".claude/settings.autonomous.json does not set CLAUDE_PROFILE=autonomous"
+fi
 
 step "framework docs"
 # Upstream keeps the root README and the framework README identical. A fork
