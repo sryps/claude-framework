@@ -46,6 +46,12 @@ fi
 step "hook tests ($(bash --version | head -1 | sed 's/.*version \([0-9.]*\).*/bash \1/'))"
 bash hooks/tests/run.sh && pass "hook tests" || fail "hook tests"
 
+step "hook tests through a symlinked TMPDIR (emulates macOS /var -> /private/var)"
+lt=$(mktemp -d "${TMPDIR:-/tmp}/fw-verify.XXXXXX")
+mkdir -p "$lt/real" && ln -s "$lt/real" "$lt/link"
+TMPDIR="$lt/link" bash hooks/tests/run.sh && pass "hook tests, symlinked TMPDIR" || fail "hook tests, symlinked TMPDIR"
+rm -rf "$lt"
+
 step "installer tests"
 bash tests/install-test.sh && pass "installer tests" || fail "installer tests"
 

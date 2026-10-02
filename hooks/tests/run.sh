@@ -205,7 +205,8 @@ pp block "$REPO/package-lock.json" 2
 pp block "$REPO/certs/server.pem" 2
 pp block "/etc/hosts" 2
 pp block "$HOME/.bashrc" 2
-pp block "$REPO/../../../../../../etc/passwd" 2
+pp block "/etc/passwd" 2
+pp block "$REPO/../../../../../../../../../../../../../../../../../../../../etc/passwd" 2
 pp allow "$REPO/src/app.ts" 0
 pp allow "$REPO/src/auth/login.ts" 0
 pp allow "$TMP/scratch.txt" 0

@@ -54,6 +54,28 @@ fw_abspath() {
   }'
 }
 
+# fw_physpath <abs path>. Resolves symlinks in the nearest existing ancestor
+# and keeps the rest. macOS /var -> /private/var, symlinked checkouts.
+fw_physpath() {
+  local abs=$1 dir rest=""
+  dir=$abs
+  while [ -n "$dir" ] && [ ! -d "$dir" ]; do
+    rest="/${dir##*/}$rest"
+    dir=${dir%/*}
+  done
+  [ -z "$dir" ] && dir=/
+  dir=$(cd "$dir" 2>/dev/null && pwd -P) || { printf '%s' "$abs"; return; }
+  [ "$dir" = / ] && dir=""
+  printf '%s' "$dir$rest"
+}
+
+# fw_same_path <a> <b>. True when both name the same path, lexically or
+# after resolving symlinks.
+fw_same_path() {
+  [ "$1" = "$2" ] && return 0
+  [ "$(fw_physpath "$1")" = "$(fw_physpath "$2")" ]
+}
+
 # fw_inside_root <abs path>. True when the path is in FW_ROOT, lexically or
 # after resolving symlinks (macOS /var -> /private/var, symlinked checkouts).
 fw_inside_root() {

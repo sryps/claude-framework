@@ -202,14 +202,14 @@ check_segment() {
         "~"|"~/"*|'$HOME'*|'${HOME}'*|"/"|"/*"|"*"|".."|"../"*|"."|"./") deny "recursive delete of '$a'." ;;
       esac
       abs=$(fw_abspath "$a")
-      [ "$abs" = "$FW_ROOT" ] && deny "recursive delete of the project root."
+      fw_same_path "$abs" "$FW_ROOT" && deny "recursive delete of the project root."
       if ! fw_inside_root "$abs"; then
         case "$abs" in
           "${TMPDIR:-/tmp}"/*|/tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*) ;;
           *) deny "recursive delete outside the project directory ($abs)." ;;
         esac
       fi
-      [ "$abs" = "$FW_ROOT/.git" ] && deny "deleting the git directory."
+      fw_same_path "$abs" "$FW_ROOT/.git" && deny "deleting the git directory."
     done
   fi
 
