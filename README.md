@@ -2,10 +2,9 @@
 
 Rules, guards, and skills for writing production software with Claude Code agents, attended or unattended. It works for web apps, mobile apps, services, and binaries.
 
-The framework has two parts:
+Everything lives in the project's `.claude/` directory: settings, hooks, skills, subagents, rules, and output styles. It travels with the repo, so every clone, every teammate, and every agent run gets the same guards. Nothing is installed globally.
 
-- A Claude Code plugin named `agent-guardrails`, with hooks, skills, and subagents. The hooks run on every tool call. They block what an agent must never do and check what it did before it may stop.
-- `install.sh`, which writes the project files a plugin cannot set: permissions, the autonomous profile, domain rules, output styles, and templates.
+The hooks run on every tool call. They block what an agent must never do and check what it did before it may stop.
 
 ## Principles
 
@@ -22,38 +21,44 @@ The framework has two parts:
 | Yellow | Do it on a branch. The PR needs a `Security-Review:` section and a human review | Auth, crypto, sessions, migrations, CI, infra, dependency manifests | `yellow-notice`, `pr-gate` |
 | Red | Never | Merge, push to a protected branch, force push, deploy, publish, secrets, prod data, edit agent settings | `bash-guard`, `protected-paths`, `secret-write-guard`, permission denies |
 
-## Install
+## Start a project
 
-Requirements: `git`, `jq`. Recommended: `gitleaks`, `semgrep`, `gh`.
+Requirements: `git`, `jq`. Recommended: `gitleaks`, `semgrep`, and a forge CLI (`gh`, `glab`, or `tea`).
 
 ```sh
 # macOS
-brew install jq gitleaks semgrep gh
+brew install jq gitleaks semgrep
 # Debian, Ubuntu, WSL2
-sudo apt install jq gh && pipx install semgrep   # gitleaks: see github.com/gitleaks/gitleaks/releases
+sudo apt install jq && pipx install semgrep   # gitleaks: see github.com/gitleaks/gitleaks/releases
 ```
 
-Then, from a clone of this repo:
+### New project: fork or use as a template
+
+1. Fork this repo, or use it as a template, and clone it.
+2. Pick the stack overlays and write the settings:
+   ```sh
+   .claude/framework/install.sh                         # detect overlays from the files present
+   .claude/framework/install.sh --overlay node,supabase # or name them
+   ```
+3. Replace this README with your project's README. The framework docs stay in `.claude/framework/README.md`.
+4. Fill in the placeholders in `CLAUDE.md`.
+5. Start Claude Code in the repo. It loads `.claude/` on its own.
+
+Pull framework updates from upstream like any other change: `git remote add upstream <framework repo URL>`, then `git fetch upstream && git merge upstream/main`.
+
+### Existing project: copy the framework in
+
+From a clone of this repo:
 
 ```sh
-./install.sh ~/code/my-app                 # detect stack overlays
-./install.sh --overlay node,supabase ~/code/my-app
-./install.sh --dry-run ~/code/my-app       # show what changes
-./install.sh --git-hooks ~/code/my-app     # also run security-check.sh on commit and push
+.claude/framework/install.sh ~/code/my-app             # detect overlays
+.claude/framework/install.sh --dry-run ~/code/my-app   # show what changes
+.claude/framework/install.sh --git-hooks ~/code/my-app # also run security-check.sh on commit and push
 ```
+
+This copies `.claude/{hooks,skills,agents,rules,output-styles,framework}`, `scripts/`, and `.githooks/` into the project. It merges the framework settings into any `.claude/settings.json` already there. To update, run the same command from a newer checkout. A framework file you edited is kept and reported. `--force` replaces it and keeps a `.bak` copy. `.claude/framework/manifest.tsv` records what was installed.
 
 GitHub files (PR template, workflows, Dependabot) are written only when the project's `origin` is on github.com. Use `--ci github` or `--ci none` to choose. Every check also runs locally with no CI service, through `scripts/security-check.sh` and the git hooks.
-
-Install the plugin, from the terminal or inside Claude Code:
-
-```sh
-claude plugin marketplace add <owner>/<repo>   # the GitHub repo you cloned, or a git URL, or a local path
-claude plugin install agent-guardrails@agent-guardrails
-```
-
-The installed `.claude/settings.json` also lists the marketplace and enables the plugin, so a teammate who opens the project gets a prompt to install it.
-
-Re-running `install.sh` is safe. It merges settings again, keeps files you edited, and reports each one it kept. Pass `--force` to replace templates; it keeps a `.bak` copy.
 
 ## Unattended runs
 
@@ -66,7 +71,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 
 ## What is in the box
 
-### Hooks (plugin)
+### Hooks (`.claude/hooks/`)
 
 | Event | Hook | What it does |
 |---|---|---|
@@ -81,7 +86,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | Stop | `diff-scan` | Secret scan (gitleaks or built-in patterns) on changed files; semgrep in autonomous runs |
 | Stop | `test-gate` | Runs the tests before the agent may stop (autonomous) |
 
-### Skills (plugin)
+### Skills (`.claude/skills/`)
 
 | Skill | Use |
 |---|---|
@@ -101,15 +106,15 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | `vulnscan` | Random-file vulnerability sweep with parallel scouts |
 | `unslop` | Remove AI tells from prose that ships |
 
-### Subagents (plugin)
+### Subagents (`.claude/agents/`)
 
 `security-reviewer` (read-only), `test-writer` (test files only), `architect` (read-only).
 
-### Project files (`install.sh`)
+### Settings and other files
 
 | File | Content |
 |---|---|
-| `.claude/settings.json` | Base permissions and stack overlays, merged into your file |
+| `.claude/settings.json` | Base permissions, hook wiring, and stack overlays |
 | `.claude/settings.autonomous.json` | The same, plus the autonomous profile and cloud CLI denies |
 | `.claude/rules/*.md` | Security, auth, API, backend, frontend, data, mobile, CLI, testing, agentic verification, dependencies, CI/CD, logging |
 | `.claude/output-styles/` | Terse (attended) and Autonomous (unattended) |
@@ -139,6 +144,15 @@ Set these in the `env` block of the project `.claude/settings.json`.
 | `FW_SEMGREP_CONFIG` | semgrep rules. The default is `p/default` |
 | `FW_FORMAT_LINT=off` | Turn off `format-lint` |
 | `FW_SESSION_GIT=0`, `FW_SESSION_TOOLS=0` | Hide those sections of the session context |
+| `FW_MAINTAINER=1` | Framework development only. Hooks, `.claude/framework/`, and git hooks become Yellow. Set it by hand in `.claude/settings.local.json` |
+
+### What an agent may change in `.claude/`
+
+| Path | Tier |
+|---|---|
+| `.claude/settings*.json`, `.mcp.json`, `.git/` | Red, always |
+| `.claude/hooks/`, `.claude/framework/`, `.githooks/`, `scripts/security-check.sh`, `scripts/claude-autonomous.sh` | Red. Yellow with `FW_MAINTAINER=1` |
+| `.claude/skills/`, `.claude/agents/`, `.claude/rules/`, `.claude/output-styles/` | Yellow. A project may tune them, with review |
 
 ## Platforms
 
@@ -152,14 +166,15 @@ Set these in the `env` block of the project `.claude/settings.json`.
 | Claude Desktop, chat | Skills only, uploaded as a zip | No |
 | Native Windows | Hooks run under Git Bash. Not tested | No |
 
-Hooks are bash scripts that run through `bash` explicitly, so a zsh login shell does not matter. They target bash 3.2, which macOS ships, and work with both BSD and GNU tools. `scripts/verify.sh` runs the tests under bash 3.2: `/bin/bash` on macOS, or a container elsewhere.
+Hooks are bash scripts that run through `bash` explicitly, so a zsh login shell does not matter. They target bash 3.2, which macOS ships, and work with both BSD and GNU tools. `.claude/framework/verify.sh` runs the tests under bash 3.2: `/bin/bash` on macOS, or a container elsewhere.
 
 `scripts/claude-autonomous.sh` needs the CLI. The Desktop app has no `--settings` flag, so Desktop sessions run the attended profile.
 
 ## Limits
 
 - Hooks do not isolate the agent. A process can still write a script file and run it, and no hook reads that file. Turn on the `sandbox` overlay where it is available, and keep production credentials off the machine.
-- `bash-guard` matches patterns and does not fully parse shell. `hooks/tests/run.sh` lists each spelling it blocks.
+- `bash-guard` matches patterns and does not fully parse shell. `.claude/framework/tests/hooks-test.sh` lists each spelling it blocks.
+- A skill with the same name in `~/.claude/skills/` may shadow the project's copy. Remove or rename the personal copy if they differ.
 - Path-scoped rules in `.claude/rules/` may not load on their own in every Claude Code version. `CLAUDE.md` tells the agent to read the matching file before it changes an area.
 
 ## Development
@@ -167,14 +182,17 @@ Hooks are bash scripts that run through `bash` explicitly, so a zsh login shell 
 Everything is verified locally. No CI service is needed.
 
 ```sh
-make verify          # JSON, shellcheck, hook tests, installer tests, plugin manifest, bash 3.2
-make verify-quick    # the same without the bash 3.2 container
-make test            # hook and installer tests only
+.claude/framework/verify.sh          # JSON, settings drift, shellcheck, hook tests, installer tests, bash 3.2
+.claude/framework/verify.sh --quick  # the same without the bash 3.2 container
 ```
 
-`verify.sh` prints SKIP, not PASS, for any check whose tool is missing (shellcheck, the claude CLI, docker). Run it on macOS and on Linux before a release. `.github/workflows/test.yml` is an optional wrapper that runs the same script.
+`verify.sh` prints SKIP, not PASS, for any check whose tool is missing (shellcheck, docker). Run it on macOS and on Linux before a release. `.github/workflows/test.yml` is an optional wrapper that runs the same script.
 
-Test a local checkout as a plugin: `./install.sh --plugin-local <project>`, then `claude plugin marketplace add "$PWD"`.
+This repo runs under its own guards. To change hooks or framework files with Claude, a human sets `FW_MAINTAINER=1` in `.claude/settings.local.json`:
+
+```json
+{ "env": { "FW_MAINTAINER": "1" } }
+```
 
 ## License
 

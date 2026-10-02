@@ -79,8 +79,5 @@
       "Bash(helm install*)",
       "Bash(helm upgrade*)"
     ]
-  },
-  "enabledPlugins": {
-    "agent-guardrails@agent-guardrails": true
   }
 }

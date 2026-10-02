@@ -49,7 +49,7 @@ never get committed.
    - If the human named files/globs → use those (expand globs with Glob).
    - Otherwise → `python3 <skill-base-dir>/pick-files.py --count <count> [--seed <seed>] [--root <path>] [--ext <list>]`.
      `<skill-base-dir>` is the base directory Claude Code states when it loads this
-     skill. `pick-files.py` sits next to this SKILL.md, for a plugin or a user install.
+     skill. `pick-files.py` sits next to this SKILL.md (`.claude/skills/vulnscan/` in a project).
      The script picks random non-test source files and prunes build/dependency
      dirs. Pass `--ext` if the human names a language (e.g. `--ext py`).
    - Write the chosen paths to `.vuln-scan/files.txt`.

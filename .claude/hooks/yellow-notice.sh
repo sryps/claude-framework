@@ -30,6 +30,8 @@ case "$reason" in
   database*) duty="Follow the db-migration skill: reversible migration, no destructive change in one step, RLS or policy on every new table." ;;
   CI*) duty="Pin every third-party action to a full commit SHA. Give the workflow the least permissions it needs. Never expose secrets to pull_request_target or fork PRs." ;;
   infrastructure*) duty="Keep least privilege, no public exposure by default, no secrets in the file. Record the change in the PR." ;;
+  agent*) duty="These files steer every future agent run. Keep each rule enforceable and specific. Never weaken a security rule or remove a required step." ;;
+  framework*) duty="Maintainer mode. Run .claude/framework/verify.sh before you finish. Every guard change needs a test in .claude/framework/tests/hooks-test.sh." ;;
   dependency*) duty="Follow the add-dependency skill for each new package. Regenerate the lockfile with the package manager." ;;
   *) duty="Describe the change and its risk in the PR." ;;
 esac

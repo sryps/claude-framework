@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Hook test suite. Runs on bash 3.2+ with GNU or BSD userland.
-#   bash hooks/tests/run.sh            # all tests
-#   bash hooks/tests/run.sh bash-guard # tests whose name contains the word
+#   bash .claude/framework/tests/hooks-test.sh            # all tests
+#   bash .claude/framework/tests/hooks-test.sh bash-guard # names containing the word
 # Needs jq and git.
 set -u
-HOOKS=$(cd "$(dirname "$0")/.." && pwd)
+HOOKS=$(cd "$(dirname "$0")/../../hooks" && pwd)
 FILTER=${1:-}
 PASS=0
 FAIL=0
@@ -23,7 +23,7 @@ echo "# t" > README.md
 git add README.md
 git commit -qm init
 git checkout -q -b feat/x
-unset CLAUDE_PROFILE CLAUDE_PROJECT_DIR FW_GUARD_ALLOW 2>/dev/null
+unset CLAUDE_PROFILE CLAUDE_PROJECT_DIR FW_GUARD_ALLOW FW_MAINTAINER 2>/dev/null
 export TMPDIR="$TMP"
 
 # json_bash <command>
@@ -188,6 +188,20 @@ block "git merge feat/x"
 allow "git switch -c feat/y"
 git checkout -q feat/x
 
+# Framework guard files.
+block "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
+block "rm .claude/framework/install.sh"
+block "bash .claude/framework/install.sh"
+block "git config core.hooksPath .githooks"
+allow "bash .claude/framework/verify.sh"
+allow ".claude/framework/verify.sh --quick"
+allow "bash .claude/framework/tests/hooks-test.sh bash-guard"
+allow "cat .claude/hooks/bash-guard.sh"
+export FW_MAINTAINER=1
+allow "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
+block "sed -i 's/x/y/' .claude/settings.json"
+unset FW_MAINTAINER
+
 # Escape hatch.
 export FW_GUARD_ALLOW='^make deploy-staging$'
 allow "make deploy-staging"
@@ -201,6 +215,19 @@ pp allow "$REPO/.env.example" 0
 pp block "$REPO/.claude/settings.json" 2
 pp block "$REPO/.claude/settings.local.json" 2
 pp block "$REPO/.git/hooks/pre-commit" 2
+pp block "$REPO/.claude/hooks/bash-guard.sh" 2
+pp block "$REPO/.claude/hooks/lib/policy.sh" 2
+pp block "$REPO/.claude/framework/settings/base.json" 2
+pp block "$REPO/.githooks/pre-push" 2
+pp block "$REPO/scripts/security-check.sh" 2
+pp allow "$REPO/.claude/skills/feature/SKILL.md" 0
+pp allow "$REPO/.claude/rules/api.md" 0
+pp allow "$REPO/scripts/seed.sh" 0
+pp allow "$REPO/CLAUDE.md" 0
+export FW_MAINTAINER=1
+pp allow "$REPO/.claude/hooks/bash-guard.sh" 0
+pp block "$REPO/.claude/settings.json" 2
+unset FW_MAINTAINER
 pp block "$REPO/package-lock.json" 2
 pp block "$REPO/certs/server.pem" 2
 pp block "/etc/hosts" 2
@@ -253,6 +280,7 @@ yn migration "$REPO/supabase/migrations/001_init.sql" "database"
 yn ci "$REPO/.github/workflows/ci.yml" "CI"
 yn deps "$REPO/package.json" "dependency"
 yn green "$REPO/src/components/Button.tsx" ""
+yn agent "$REPO/.claude/rules/api.md" "agent instructions"
 
 # --- pr-gate ---
 mkdir -p "$REPO/src/auth"

@@ -86,9 +86,12 @@ check_segment() {
   done
 
   # --- agent control files ---
-  if printf '%s' "$s" | grep -qE '\.claude/settings[^[:space:]]*\.json|\.claude/hooks/|\.git/hooks/|core\.hooksPath'; then
-    printf '%s' "$s" | grep -qE '^(cat|ls|head|tail|less|grep|rg|jq|diff|git[[:space:]]+(diff|log|show|status))[[:space:]]' || \
-      deny "changing agent settings or git hooks can turn off the guards."
+  guard_re='\.claude/settings[^[:space:]]*\.json|\.git/hooks/|core\.hooksPath'
+  [ "${FW_MAINTAINER:-}" = 1 ] || guard_re="$guard_re|\.claude/hooks/|\.claude/framework/|\.githooks/"
+  if printf '%s' "$s" | grep -qE "$guard_re"; then
+    # Reading is fine. So is running the framework's own checks.
+    printf '%s' "$s" | grep -qE '^(cat|ls|head|tail|less|grep|rg|jq|diff|wc|git[[:space:]]+(diff|log|show|status|ls-files))[[:space:]]|^((ba)?sh[[:space:]]+)?[^[:space:]]*\.claude/framework/(verify\.sh|tests/[^[:space:]]+\.sh)([[:space:]]|$)' || \
+      deny "changing agent settings, framework guard files, or git hooks can turn off the guards."
   fi
   if printf '%s' "$s" | grep -qE "^git([[:space:]]|$).*--no-verify|^git([[:space:]]|$).*[[:space:]]-n([[:space:]]|$).*commit|^git[[:space:]]+commit([[:space:]].*)?[[:space:]]-[a-zA-Z]*n[a-zA-Z]*([[:space:]]|$)"; then
     deny "--no-verify skips the repository's git hooks."

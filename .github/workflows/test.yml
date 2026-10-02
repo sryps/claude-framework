@@ -1,5 +1,5 @@
-# Optional. Runs the same local check, scripts/verify.sh, on GitHub runners.
-# Nothing in the framework depends on this file. Run `make verify` locally.
+# Optional. Runs the same local check, .claude/framework/verify.sh, on GitHub
+# runners. Nothing in the framework depends on this file.
 name: verify
 
 on:
@@ -25,4 +25,4 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = macOS ]; then brew install jq shellcheck; else sudo apt-get update -qq && sudo apt-get install -y -qq jq shellcheck; fi
       - name: Verify
-        run: bash scripts/verify.sh
+        run: bash .claude/framework/verify.sh

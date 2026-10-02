@@ -6,6 +6,9 @@
 #   FW_RED_PATHS_EXTRA     ERE, matched against the repo-relative path
 #   FW_YELLOW_PATHS_EXTRA  ERE, matched against the repo-relative path
 #   FW_SECRET_ALLOW        ERE, a matching line is never reported as a secret
+#   FW_MAINTAINER=1        framework development only: hooks, framework, and
+#                          git hook files become Yellow instead of Red.
+#                          Set it by hand in .claude/settings.local.json.
 
 # Secret files. Templates (.env.example and similar) stay editable.
 FW_SECRET_FILE_RE='(^|/)\.env($|\.)|(^|/)\.envrc$|\.(pem|key|p8|p12|pfx|keystore|jks|mobileprovision)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|(^|/)\.netrc$|(^|/)\.npmrc$|(^|/)\.pypirc$|(^|/)credentials(\.json)?$|(^|/)service-account[^/]*\.json$|(^|/)google-services[^/]*\.json$|(^|/)GoogleService-Info[^/]*\.plist$|(^|/)\.ssh/|(^|/)\.aws/|(^|/)\.config/gh/|(^|/)\.kube/config$|(^|/)\.docker/config\.json$|(^|/)\.git-credentials$'
@@ -14,8 +17,11 @@ FW_SECRET_TEMPLATE_RE='\.(example|sample|template|dist|defaults)(\.[A-Za-z0-9]+)
 FW_LOCKFILE_RE='(^|/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|pubspec\.lock|flake\.lock)$'
 
 # Files that control the agent itself. An agent that edits these can turn off
-# its own guards.
-FW_CONTROL_RE='(^|/)\.claude/settings[^/]*\.json$|(^|/)\.claude/hooks/|(^|/)\.claude-plugin/|(^|/)\.git/|(^|/)\.mcp\.json$|(^|/)\.husky/|(^|/)\.pre-commit-config\.yaml$|(^|/)lefthook\.ya?ml$'
+# its own guards. Settings and git internals stay Red even for maintainers.
+FW_CONTROL_RE='(^|/)\.claude/settings[^/]*\.json$|(^|/)\.git/|(^|/)\.mcp\.json$'
+FW_GUARD_RE='(^|/)\.claude/hooks/|(^|/)\.claude/framework/|(^|/)\.githooks/|(^|/)scripts/(security-check|claude-autonomous)\.sh$|(^|/)\.husky/|(^|/)\.pre-commit-config\.yaml$|(^|/)lefthook\.ya?ml$'
+# Instructions the agent follows. A project may tune them, with review.
+FW_YELLOW_AGENT_RE='(^|/)\.claude/(skills|agents|rules|output-styles|commands)/|(^|/)\.claude/pull_request_template\.md$'
 
 FW_YELLOW_AUTH_RE='(^|/|[-_.])(auth|authn|authz|oauth|oidc|saml|sso|login|logout|signin|signup|session|sessions|jwt|token|tokens|password|passwd|credential|credentials|crypto|cipher|encrypt|decrypt|hash|permission|permissions|rbac|acl|policy|policies|middleware|guard|guards|csrf|cors|mfa|totp|2fa)([-_./]|$)'
 FW_YELLOW_DATA_RE='(^|/)(migrations?|migrate|db/schema|schema\.(sql|rb|prisma)|prisma/schema\.prisma|supabase/migrations|alembic|flyway|liquibase)(/|$|\.)|\.sql$'
@@ -105,7 +111,11 @@ fw_path_tier() {
   rel=$(fw_relpath "$abs")
 
   if fw_is_secret_path "$rel"; then echo "red secret or credential file"; return; fi
-  if printf '%s' "$rel" | grep -qE "$FW_CONTROL_RE"; then echo "red agent control file (settings, hooks, git internals, git hooks)"; return; fi
+  if printf '%s' "$rel" | grep -qE "$FW_CONTROL_RE"; then echo "red agent control file (settings, git internals, MCP config)"; return; fi
+  if printf '%s' "$rel" | grep -qE "$FW_GUARD_RE"; then
+    if [ "${FW_MAINTAINER:-}" = 1 ]; then echo "yellow framework guard file (maintainer mode)"; return; fi
+    echo "red framework guard file (hooks, framework scripts, git hooks)"; return
+  fi
   if printf '%s' "$rel" | grep -qE "$FW_LOCKFILE_RE"; then echo "red lockfile; regenerate it with the package manager instead of editing it"; return; fi
   if [ -n "${FW_RED_PATHS_EXTRA:-}" ] && printf '%s' "$rel" | grep -qE "$FW_RED_PATHS_EXTRA"; then echo "red project policy (FW_RED_PATHS_EXTRA)"; return; fi
   if ! fw_inside_root "$abs"; then
@@ -115,6 +125,7 @@ fw_path_tier() {
     esac
   fi
 
+  if printf '%s' "$rel" | grep -qE "$FW_YELLOW_AGENT_RE"; then echo "yellow agent instructions (skills, agents, rules, styles)"; return; fi
   if printf '%s' "$rel" | grep -qiE "$FW_YELLOW_AUTH_RE"; then echo "yellow auth, session, or crypto code"; return; fi
   if printf '%s' "$rel" | grep -qE "$FW_YELLOW_DATA_RE"; then echo "yellow database schema or migration"; return; fi
   if printf '%s' "$rel" | grep -qE "$FW_YELLOW_CI_RE"; then echo "yellow CI or release pipeline"; return; fi
