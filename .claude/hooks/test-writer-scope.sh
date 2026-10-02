@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# PreToolUse hook (Edit|Write|MultiEdit|NotebookEdit) for the test-writer
-# subagent only. It is wired in .claude/agents/test-writer.md, not in the
-# project settings. Blocks any edit outside test files and test fixtures, so
-# the agent that writes the failing tests cannot also change the code under
-# test.
+# PreToolUse hook (Edit|Write|MultiEdit|NotebookEdit): when the caller is the
+# test-writer subagent, block any edit outside test files and fixtures, so the
+# agent that writes the failing tests cannot also change the code under test.
+#
+# Claude Code puts agent_type in the hook input for a subagent's tool calls.
+# The hook is wired in the project settings, because hooks in an agent's
+# frontmatter did not run in testing (Claude Code 2.1.287).
 set -uo pipefail
 . "$(dirname "$0")/lib/common.sh"
 . "$(dirname "$0")/lib/policy.sh"
 
 fw_read_input
+[ "$(fw_get '.agent_type')" = test-writer ] || exit 0
 fw_enter_project
 path=$(fw_get '.tool_input.file_path // .tool_input.notebook_path')
 [ -z "$path" ] && exit 0

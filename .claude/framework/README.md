@@ -81,6 +81,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 | PreToolUse Bash | `test-guard` | Blocks a commit that skips tests or removes assertions (autonomous) |
 | PreToolUse Edit/Write | `protected-paths` | Blocks secrets, lockfiles, agent settings, git internals, files outside the project |
 | PreToolUse Edit/Write | `secret-write-guard` | Blocks content that contains a credential |
+| PreToolUse Edit/Write | `test-writer-scope` | Blocks the `test-writer` subagent from editing anything but tests and fixtures |
 | PostToolUse Edit/Write | `yellow-notice` | Flags a Yellow edit and states the extra duties |
 | PostToolUse Edit/Write | `rules-notice` | Names the `.claude/rules/` file whose `paths:` match the file just written, once per rule per session. Claude Code loads a path-scoped rule only when Claude reads a matching file, never when it creates one |
 | PostToolUse Edit/Write | `format-lint` | Runs the project formatter and linter on the file |
@@ -111,7 +112,7 @@ This starts `claude -p` with `.claude/settings.autonomous.json`. That profile tu
 
 `security-reviewer` (read-only), `test-writer` (test files only), `architect` (read-only).
 
-`test-writer` carries its own hook in its frontmatter (`test-writer-scope`), so an edit outside test files and fixtures is blocked inside that subagent. The read-only limits of the other two come from their tool lists and prompts.
+The `test-writer-scope` hook blocks any edit outside test files and fixtures when the caller is `test-writer`. Claude Code names the subagent (`agent_type`) in the hook input. The hook is wired in the project settings, because hooks in an agent's frontmatter did not run in testing. The read-only limits of the other two come from their tool lists and prompts.
 
 ### Settings and other files
 

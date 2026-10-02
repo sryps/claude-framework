@@ -298,7 +298,9 @@ esac
 block "rm -rf $REPO"
 
 # --- test-writer-scope ---
-tw() { expect "test-writer-scope $1: $2" "$3" test-writer-scope "$(json_write "$REPO/$2" x)"; }
+tw() { expect "test-writer-scope $1: $2" "$3" test-writer-scope "$(json_write "$REPO/$2" x | jq '. + {agent_id: "a1", agent_type: "test-writer"}')"; }
+expect "test-writer-scope main agent unaffected" 0 test-writer-scope "$(json_write "$REPO/src/auth/login.ts" x)"
+expect "test-writer-scope other subagent unaffected" 0 test-writer-scope "$(json_write "$REPO/src/auth/login.ts" x | jq '. + {agent_id: "a2", agent_type: "architect"}')"
 tw allow src/auth/login.test.ts 0
 tw allow tests/api/users_test.py 0
 tw allow src/__tests__/a.tsx 0
@@ -354,7 +356,7 @@ printf -- '# always loaded, no paths\n' > "$REPO/.claude/rules/security.md"
 rn() {
   local name="rules-notice $1"
   case "$name" in *"$FILTER"*) ;; *) return ;; esac
-  out=$(jq -n --arg p "$REPO/$2" --arg cwd "$REPO" --arg sid "$4" '{session_id:$sid,cwd:$cwd,tool_name:"Write",tool_input:{file_path:$p,content:"x"}}' | bash "$HOOKS/rules-notice.sh" 2>/dev/null)
+  out=$(jq -n --arg p "$REPO/$2" --arg cwd "$REPO" --arg sid "$4" --arg aid "${5:-}" '{session_id:$sid,cwd:$cwd,tool_name:"Write",tool_input:{file_path:$p,content:"x"}} + (if $aid == "" then {} else {agent_id:$aid, agent_type:"test-writer"} end)' | bash "$HOOKS/rules-notice.sh" 2>/dev/null)
   if { [ -z "$3" ] && [ -z "$out" ]; } || { [ -n "$3" ] && printf '%s' "$out" | grep -q -- "$3"; }; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
   FAIL $name: want '$3', got: $(printf '%s' "$out" | head -c 200)"; fi
 }
@@ -368,6 +370,9 @@ rn "brace miss" "src/ui/forms/Button.js" "" r6
 rn "css anywhere" "styles/main.css" "rules/frontend.md" r7
 rn "no paths rule not named" "src/lib/math.ts" "" r8
 rn "two rules at once" "src/ui/auth/LoginForm.tsx" "rules/auth.md .claude/rules/frontend.md" r9
+rn "subagent sees the rule" "src/auth/a.test.ts" "rules/auth.md" r10 sub1
+rn "subagent once" "src/auth/b.test.ts" "" r10 sub1
+rn "main agent not muted by subagent" "src/auth/session.ts" "rules/auth.md" r10
 rm -rf "$REPO/.claude/rules"
 
 # --- pr-gate ---

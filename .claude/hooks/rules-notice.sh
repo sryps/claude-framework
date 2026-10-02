@@ -74,11 +74,15 @@ glob_to_ere() {
 }
 
 state=$(fw_state_dir)
+# One notice per rule per agent: a subagent shares the session id, and its
+# notice must not mute the rule for the main agent.
+agent=$(fw_get '.agent_id')
+agent=$(printf '%s' "${agent:-main}" | tr -c 'A-Za-z0-9_-' '_')
 hits=""
 for rule in "$rules_dir"/*.md; do
   [ -f "$rule" ] || continue
   name=$(basename "$rule")
-  [ -f "$state/rule.$name" ] && continue
+  [ -f "$state/rule.$agent.$name" ] && continue
   matched=0
   while IFS= read -r g; do
     [ -z "$g" ] && continue
@@ -87,7 +91,7 @@ for rule in "$rules_dir"/*.md; do
 $(rule_globs "$rule")
 EOF
   if [ "$matched" = 1 ]; then
-    touch "$state/rule.$name"
+    touch "$state/rule.$agent.$name"
     hits="$hits .claude/rules/$name"
   fi
 done
