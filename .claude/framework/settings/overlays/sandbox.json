@@ -1,0 +1,21 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.azure",
+        "~/.config/gcloud",
+        "~/.config/gh",
+        "~/.kube",
+        "~/.docker/config.json",
+        "~/.git-credentials",
+        "~/.netrc",
+        "~/.npmrc",
+        "~/.pypirc",
+        "~/.gnupg"
+      ]
+    }
+  }
+}

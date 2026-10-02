@@ -1,0 +1,36 @@
+{
+  "env": {
+    "SUPABASE_ACCESS_TOKEN": "placeholder-not-a-token-agent-runs-have-no-production-access",
+    "SUPABASE_DB_PASSWORD": "placeholder-agent-runs-have-no-production-access"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(supabase start*)",
+      "Bash(supabase stop*)",
+      "Bash(supabase status*)",
+      "Bash(supabase db reset)",
+      "Bash(supabase db lint*)",
+      "Bash(supabase test db*)",
+      "Bash(supabase migration new *)",
+      "Bash(supabase gen types *--local*)"
+    ],
+    "deny": [
+      "Bash(supabase db push*)", "Bash(npx supabase db push*)",
+      "Bash(supabase link*)", "Bash(npx supabase link*)",
+      "Bash(supabase unlink*)", "Bash(npx supabase unlink*)",
+      "Bash(supabase functions deploy*)", "Bash(npx supabase functions deploy*)",
+      "Bash(supabase secrets*)", "Bash(npx supabase secrets*)",
+      "Bash(supabase config push*)", "Bash(npx supabase config push*)",
+      "Bash(supabase migration repair*)", "Bash(npx supabase migration repair*)",
+      "Bash(supabase db pull*)", "Bash(npx supabase db pull*)",
+      "Bash(supabase db dump*)", "Bash(npx supabase db dump*)",
+      "Bash(supabase inspect*)", "Bash(npx supabase inspect*)",
+      "Bash(supabase storage*)", "Bash(npx supabase storage*)",
+      "Bash(supabase projects*)", "Bash(npx supabase projects*)",
+      "Bash(supabase branches*)", "Bash(npx supabase branches*)",
+      "Bash(supabase login*)", "Bash(npx supabase login*)",
+      "Bash(supabase orgs*)", "Bash(npx supabase orgs*)",
+      "Bash(supabase sso*)", "Bash(npx supabase sso*)"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test*)", "Bash(npm run test*)", "Bash(npm run lint*)", "Bash(npm run build*)", "Bash(npm run typecheck*)",
+      "Bash(pnpm test*)", "Bash(pnpm run test*)", "Bash(pnpm lint*)", "Bash(pnpm build*)", "Bash(pnpm typecheck*)",
+      "Bash(yarn test*)", "Bash(yarn lint*)", "Bash(yarn build*)",
+      "Bash(npx tsc --noEmit*)", "Bash(npx vitest*)", "Bash(npx jest*)", "Bash(npx playwright test*)",
+      "Bash(npm audit*)", "Bash(npm ls*)", "Bash(npm outdated*)"
+    ],
+    "deny": [
+      "Bash(npm publish*)", "Bash(npm unpublish*)", "Bash(npm deprecate*)", "Bash(npm dist-tag*)", "Bash(npm owner*)", "Bash(npm token*)", "Bash(npm login*)", "Bash(npm adduser*)",
+      "Bash(pnpm publish*)", "Bash(yarn npm publish*)", "Bash(bun publish*)",
+      "Bash(npx vercel*)", "Bash(vercel*)", "Bash(npx netlify deploy*)", "Bash(netlify deploy*)"
+    ]
+  }
+}

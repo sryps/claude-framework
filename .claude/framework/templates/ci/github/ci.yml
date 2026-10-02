@@ -1,0 +1,50 @@
+# Build and test skeleton. Copy to .github/workflows/ci.yml and fill the
+# {{placeholders}}. Pin every action to a full commit SHA before use.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.task }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest] # add macos-latest for CLIs, scripts, or iOS
+        task: [lint, typecheck, test, build]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Node example. Replace with setup-python, setup-go, rust-toolchain, and so on.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install from lockfile
+        run: npm ci --ignore-scripts # {{pnpm install --frozen-lockfile | uv sync --frozen | cargo fetch --locked}}
+
+      - name: Run ${{ matrix.task }}
+        env:
+          TASK: ${{ matrix.task }}
+        run: |
+          case "$TASK" in
+            lint)      npm run lint ;;       # {{lint command}}
+            typecheck) npm run typecheck ;;  # {{typecheck command}}
+            test)      npm test ;;           # {{test command}}
+            build)     npm run build ;;      # {{build command}}
+          esac
