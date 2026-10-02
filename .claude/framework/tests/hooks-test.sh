@@ -188,6 +188,30 @@ block "git merge feat/x"
 allow "git switch -c feat/y"
 git checkout -q feat/x
 
+# Text that never runs: heredoc bodies and quoted messages.
+NL='
+'
+allow "cat > README.md <<'EOF'${NL}sudo apt install jq${NL}git push origin main${NL}EOF"
+allow "cat > notes.md <<-EOF${NL}	printenv is blocked${NL}	EOF${NL}echo done"
+block "bash <<'EOF'${NL}git push origin main${NL}EOF"
+block "sh -s <<EOF${NL}sudo rm -rf /${NL}EOF"
+block "cat > README.md <<'EOF'${NL}docs${NL}EOF${NL}git push origin main"
+block "cat > .claude/settings.json <<'EOF'${NL}{}${NL}EOF"
+allow "git commit -m 'docs: mention .claude/settings.json, sudo, and .env'"
+allow "git add -A && git commit -q -m \"fix: guard .claude/hooks/ edits${NL}${NL}Body names git push origin main.\""
+allow "gh pr create --title 'fix: printenv' --body 'touches .env handling'"
+allow "glab mr create --title t --description 'mentions git reset --hard'"
+block "git commit -m \"\$(cat .env)\""
+block "git commit -m x && sed -i 's/a/b/' .claude/settings.json"
+block "echo 'git commit -m x' && git push origin main"
+block "grep -m 'x' .env"
+block "cat x > .claude/settings.json"
+block "jq . a.json > .claude/settings.local.json"
+block "grep -v x .claude/hooks/bash-guard.sh > /tmp/g"
+allow "grep -n deny .claude/settings.json"
+allow "git check-ignore -q .claude/settings.local.json"
+allow "git blame .claude/hooks/bash-guard.sh"
+
 # Framework guard files.
 block "sed -i 's/x/y/' .claude/hooks/bash-guard.sh"
 block "rm .claude/framework/install.sh"

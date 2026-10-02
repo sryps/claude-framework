@@ -39,15 +39,87 @@ This is a hard limit of the framework. Do not try another spelling of the same c
 If the task needs it, stop that part and record it under Blocked with the reason, so a human can run it."
 }
 
+# Text that never runs gets removed before matching, so docs and messages do
+# not trip the guard:
+#   - heredoc bodies, unless the heredoc feeds a shell (bash <<EOF runs it)
+#   - quoted message arguments to git, gh, glab, and tea (-m, --body, ...),
+#     unless the text holds $( or a backtick, which run inside double quotes
+strip_heredocs() {
+  awk '
+    BEGIN { hd = "<<-?[ \t]*[\"\047]?[A-Za-z_][A-Za-z0-9_]*[\"\047]?" }
+    inhd {
+      line = $0
+      if (strip) sub(/^\t+/, "", line)
+      if (line == delim) { inhd = 0; print; next }
+      if (keep) print
+      next
+    }
+    {
+      print
+      probe = $0
+      gsub(/<<</, "", probe)
+      if (match(probe, hd)) {
+        m = substr(probe, RSTART, RLENGTH)
+        strip = (m ~ /^<<-/)
+        sub(/^<<-?[ \t]*/, "", m)
+        gsub(/[\"\047]/, "", m)
+        delim = m
+        inhd = 1
+        keep = (probe ~ /(^|[;&|( \t])(sudo[ \t]+)?((ba|z|da|k)?sh|ssh|eval|source|xargs)([ \t]|$)/)
+      }
+    }'
+}
+mask_messages() {
+  awk '
+    BEGIN { RS = "\001"; ORS = "" }
+    {
+      s = $0; n = length(s); out = ""; i = 1; cmd = ""; atstart = 1
+      while (i <= n) {
+        c = substr(s, i, 1)
+        if (c == "\"" || c == "\047") {
+          q = c; j = i + 1
+          while (j <= n) {
+            d = substr(s, j, 1)
+            if (q == "\"" && d == "\\") { j += 2; continue }
+            if (d == q) break
+            j++
+          }
+          body = substr(s, i, j - i + 1)
+          runs = (q == "\"" && (index(body, "$(") || index(body, "`")))
+          if (!runs && (cmd == "git" || cmd == "gh" || cmd == "glab" || cmd == "tea") &&
+              out ~ /(^|[ \t])(-m|--message|-b|--body|-t|--title|-d|--description|--notes)[ \t=]*$/)
+            body = q "MSG" q
+          out = out body; i = j + 1; atstart = 0
+          continue
+        }
+        if (c == ";" || c == "&" || c == "|" || c == "\n" || c == "(") {
+          atstart = 1; cmd = ""; out = out c; i++; continue
+        }
+        if (atstart && c != " " && c != "\t") {
+          j = i
+          while (j <= n && substr(s, j, 1) !~ /[ \t;&|\n()]/) j++
+          w = substr(s, i, j - i)
+          out = out w; i = j
+          if (w ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
+          sub(/.*\//, "", w); cmd = w; atstart = 0
+          continue
+        }
+        out = out c; i++
+      }
+      print out
+    }'
+}
+scan=$(printf '%s\n' "$cmd" | strip_heredocs | mask_messages)
+
 # Normalize: newlines, `&&`, `||`, `;`, `|`, `&`, `$(`, and backticks start a new segment.
-segments=$(printf '%s\n' "$cmd" | sed -E 's/([&][&]|[|][|]|[;]|[|]|[&]|[$][(]|`|[(]|[)])/\
+segments=$(printf '%s\n' "$scan" | sed -E 's/([&][&]|[|][|]|[;]|[|]|[&]|[$][(]|`|[(]|[)])/\
 /g')
 
 # Whole-string checks first. These span segments.
-if printf '%s' "$cmd" | grep -qE "(curl|wget|fetch|iwr|Invoke-WebRequest)${FW_E}[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|k|fi)?sh${FW_E}"; then
+if printf '%s' "$scan" | grep -qE "(curl|wget|fetch|iwr|Invoke-WebRequest)${FW_E}[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|k|fi)?sh${FW_E}"; then
   deny "piping a download into a shell runs unreviewed code (supply chain)."
 fi
-if printf '%s' "$cmd" | grep -qE "(ba|z)?sh[[:space:]]+<\([[:space:]]*(curl|wget)"; then
+if printf '%s' "$scan" | grep -qE "(ba|z)?sh[[:space:]]+<\([[:space:]]*(curl|wget)"; then
   deny "running a downloaded script through process substitution."
 fi
 
@@ -89,9 +161,12 @@ check_segment() {
   guard_re='\.claude/settings[^[:space:]]*\.json|\.git/hooks/|core\.hooksPath'
   [ "${FW_MAINTAINER:-}" = 1 ] || guard_re="$guard_re|\.claude/hooks/|\.claude/framework/|\.githooks/"
   if printf '%s' "$s" | grep -qE "$guard_re"; then
-    # Reading is fine. So is running the framework's own checks.
-    printf '%s' "$s" | grep -qE '^(cat|ls|head|tail|less|grep|rg|jq|diff|wc|git[[:space:]]+(diff|log|show|status|ls-files))[[:space:]]|^((ba)?sh[[:space:]]+)?[^[:space:]]*\.claude/framework/(verify\.sh|tests/[^[:space:]]+\.sh)([[:space:]]|$)' || \
+    # Reading is fine. So is running the framework's own checks. A write
+    # redirect or an in-place flag makes it a write.
+    if printf '%s' "$s" | grep -qE '>|[[:space:]](-i|--in-place)([[:space:]=]|$)' || \
+       ! printf '%s' "$s" | grep -qE '^(cat|ls|head|tail|less|grep|rg|jq|diff|wc|git[[:space:]]+(diff|log|show|status|ls-files|check-ignore|blame))[[:space:]]|^((ba)?sh[[:space:]]+)?[^[:space:]]*\.claude/framework/(verify\.sh|tests/[^[:space:]]+\.sh)([[:space:]]|$)'; then
       deny "changing agent settings, framework guard files, or git hooks can turn off the guards."
+    fi
   fi
   if printf '%s' "$s" | grep -qE "^git([[:space:]]|$).*--no-verify|^git([[:space:]]|$).*[[:space:]]-n([[:space:]]|$).*commit|^git[[:space:]]+commit([[:space:]].*)?[[:space:]]-[a-zA-Z]*n[a-zA-Z]*([[:space:]]|$)"; then
     deny "--no-verify skips the repository's git hooks."
