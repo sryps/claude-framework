@@ -76,6 +76,28 @@ fw_timeout() {
   fi
 }
 
+# fw_redact <text>. Masks values that may be secrets: the value after a
+# key-like name (token=, password:, Authorization: Bearer ...), and any run of
+# 20 or more token characters (keys, JWTs, hashes). Keeps the first 4 chars.
+fw_redact() {
+  # Case-insensitive key match in awk (BSD sed has no I flag), then the
+  # long-token and URL-password rules in portable sed.
+  printf '%s\n' "$1" | awk '{
+    s = $0; l = tolower(s); out = ""
+    re = "(pass(word)?|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|authorization|auth|bearer|basic|cookie|session|private[_-]?key|client[_-]?secret)[\"\047]?[ \t]*[:= ][ \t]*[\"\047]?"
+    while (match(l, re)) {
+      cut = RSTART + RLENGTH - 1
+      out = out substr(s, 1, cut); s = substr(s, cut + 1); l = substr(l, cut + 1)
+      if (match(l, /^[^"\047 \t&]+/)) {
+        out = out "[REDACTED]"; s = substr(s, RLENGTH + 1); l = substr(l, RLENGTH + 1)
+      }
+    }
+    print out s
+  }' | sed -E \
+    -e 's/([A-Za-z0-9_+\/=.-]{4})[A-Za-z0-9_+\/=.-]{16,}/\1[REDACTED]/g' \
+    -e 's#(://[^:/@[:space:]]+:)[^@/[:space:]]+@#\1[REDACTED]@#g'
+}
+
 # fw_log_warning <one line>. Appends an advisory finding to
 # .claude/runs/warnings.log (gitignored), so nothing a hook let through gets
 # lost: warnings-report.sh puts the session's warnings in front of the user
@@ -90,7 +112,9 @@ fw_log_warning() {
   session=$(fw_get '.session_id'); [ -z "$session" ] && session=unknown
   hook=$(basename "$0" .sh)
   detail=$(fw_get '.tool_input.command // .tool_input.file_path // .tool_input.notebook_path' | head -1 | cut -c1-200)
-  line=$(printf '%s\t%s\t%s\t%s\t%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$session" "$hook" "$detail" "$1" | tr '\n' ' ')
+  # The log ends up in the final report, the PR body, and PR comments, so
+  # redact anything that may be a secret before it is written.
+  line=$(printf '%s\t%s\t%s\t%s\t%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$session" "$hook" "$(fw_redact "$detail")" "$(fw_redact "$1")" | tr '\n' ' ')
   printf '%s\n' "$line" >>"$dir/warnings.log" 2>/dev/null || true
 }
 
