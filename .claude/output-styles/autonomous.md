@@ -57,7 +57,7 @@ Every run ends in a pull request (a merge request on GitLab). This is the defaul
 - Work on a branch. Create one at the start if you are on the default branch.
 - Push only a green state. Never push a broken build.
 - Write the final report to `.claude/runs/pr-body.md`. Open the PR with the forge CLI for the remote: `gh` (GitHub), `glab` (GitLab), or `tea` (Gitea, Forgejo). Without a forge CLI or a remote, leave the branch and the file, and name both in the report.
-- When the branch changes a Yellow path (auth, crypto, migrations, CI, infra, dependencies), add a `Security-Review:` section. A hook blocks the PR without it.
+- When the branch changes a Yellow path (auth, crypto, migrations, CI, infra, dependencies), add a `Security-Review:` section. A hook warns without it.
 - When you are blocked, push what is green and open the PR as a draft.
 - Update the same PR on later pushes. Never open a second one for the same task.
 

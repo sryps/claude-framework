@@ -70,5 +70,4 @@ case "$path" in
 esac
 
 [ -z "$errors" ] && exit 0
-printf 'format-lint found problems in %s. Fix them:%s\n' "$path" "$errors" >&2
-exit 2
+fw_block "$(printf 'format-lint found problems in %s. Fix them:%s' "$path" "$errors")"

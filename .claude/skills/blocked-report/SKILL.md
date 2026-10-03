@@ -17,7 +17,7 @@ A blocked run still ends in a PR. The report is the only thing the user reads, s
    ```bash
    git stash push -m "blocked: <short reason>"   # keep it, do not discard it
    ```
-   Never use `git reset --hard` or `git clean -f`. Hooks block them.
+   Never use `git reset --hard` or `git clean -f`. Hooks warn on them.
 3. Commit what is green:
    ```bash
    git add -A && git commit -m "wip: <what works>"

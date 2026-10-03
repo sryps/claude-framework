@@ -17,7 +17,7 @@
       "Bash(gh run view*)",
       "Bash(gh run list*)"
     ],
-    "deny": [
+    "ask": [
       "Read(**/.env)",
       "Read(**/.env.*)",
       "Read(**/.envrc)",

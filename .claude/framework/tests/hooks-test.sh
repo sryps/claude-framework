@@ -23,7 +23,10 @@ echo "# t" > README.md
 git add README.md
 git commit -qm init
 git checkout -q -b feat/x
-unset CLAUDE_PROFILE CLAUDE_PROJECT_DIR FW_GUARD_ALLOW FW_MAINTAINER 2>/dev/null
+unset CLAUDE_PROFILE CLAUDE_PROJECT_DIR FW_GUARD_ALLOW FW_MAINTAINER FW_SPEC_GATE FW_TEST_GUARD 2>/dev/null
+# The detection tests run in enforcing mode, where a finding exits 2.
+# The advisory section at the end checks the default mode.
+export FW_ENFORCE=1
 export TMPDIR="$TMP"
 
 # json_bash <command>
@@ -461,6 +464,9 @@ pgf "block when one yellow file is missing" 2 'Security-Review:\n- package.json:
 pgf "block template left as is" 2 '## Security-Review:\n\n<!--\n- package.json and .github/ in a comment\n-->\n- none\n\n## Decisions\n- package.json and .github/ outside the section\n'
 pgf "block placeholder" 2 'Security-Review:\n- <file>: <risk you checked> -> <how>\n'
 pg "ignores other commands" 0 "gh pr view"
+pg "edit without a new body passes" 0 "gh pr edit 4 --base main"
+pg "chained commit -F does not count as a body" 0 "git commit -F /tmp/msg && gh pr edit 4 --base main"
+pg "edit with a new body is checked" 2 "gh pr edit 4 --body 'no review'"
 
 # Phase B: the branch changes code.
 mkdir -p "$REPO/src/app" "$REPO/docs/specs"
@@ -569,6 +575,36 @@ case "$name" in *"$FILTER"*)
   if printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext | test("Git state")' >/dev/null; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
   FAIL session-start: no git state in context"; fi
 esac
+
+# --- advisory mode (the default) ---
+unset FW_ENFORCE
+# adv <name> <hook> <json> <field> <text>: exit 0, and the JSON field holds the text.
+adv() {
+  local name="advisory $1" out rc
+  case "$name" in *"$FILTER"*) ;; *) return ;; esac
+  out=$(printf '%s' "$3" | bash "$HOOKS/$2.sh" 2>"$TMP/err"); rc=$?
+  if [ "$rc" = 0 ] && printf '%s' "$out" | jq -e --arg t "$5" "$4 | tostring | contains(\$t)" >/dev/null 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: rc=$rc out=$(printf '%s' "$out" | head -c 200)"
+  fi
+}
+pre() { jq '. + {hook_event_name: "PreToolUse"}'; }
+adv "bash-guard warns, does not block" bash-guard "$(json_bash "git push origin main" | pre)" .hookSpecificOutput.additionalContext "Recommendation from bash-guard (not blocked)"
+adv "bash-guard user sees a warning" bash-guard "$(json_bash "cat .env" | pre)" .systemMessage "Recommendation from bash-guard"
+adv "protected-paths warns" protected-paths "$(json_write "$REPO/.env" x | pre)" .hookSpecificOutput.additionalContext "not blocked"
+adv "secret-write-guard warns" secret-write-guard "$(json_write "$REPO/src/x.ts" "k = \"$K_GH\"" | pre)" .hookSpecificOutput.additionalContext "credential"
+(cd "$REPO" && bash "$APPROVE" --revoke >/dev/null)
+adv "spec-gate warns" spec-gate "$(json_write "$REPO/src/app/b.ts" x | pre)" .hookSpecificOutput.additionalContext "spec-gate"
+export CLAUDE_PROFILE=autonomous CLAUDE_TEST_CMD="exit 3"
+adv "test-gate warns on Stop" test-gate "$(json_stop)" .systemMessage "failed with exit code 3"
+unset CLAUDE_PROFILE CLAUDE_TEST_CMD
+name="advisory clean command stays silent"
+out=$(json_bash "git status" | pre | bash "$HOOKS/bash-guard.sh"); rc=$?
+if [ "$rc" = 0 ] && [ -z "$out" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: rc=$rc out=$out"; fi
+export FW_ENFORCE=1
 
 echo "pass: $PASS  fail: $FAIL"
 [ "$FAIL" -eq 0 ] || { printf '%s\n' "$FAILED"; exit 1; }

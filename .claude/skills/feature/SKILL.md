@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent, Skill
 
 **Arguments:** `$ARGUMENTS` (the task)
 
-The loop ends in an open PR. You never merge it. Hooks block merge, push to a protected branch, deploy, and secrets.
+The loop ends in an open PR. You never merge it. Hooks warn on merge, push to a protected branch, deploy, and secrets. Treat a warning as a stop sign.
 
 ## Mode
 
@@ -28,11 +28,11 @@ The loop ends in an open PR. You never merge it. Hooks block merge, push to a pr
 git switch -c <type>/<short-name>   # feat/, fix/, chore/, refactor/, docs/
 ```
 
-Never commit on `main`, `master`, or a release branch. A hook blocks it.
+Never commit on `main`, `master`, or a release branch. A hook warns when you do.
 
 ## 3. Spec and threat notes
 
-Tests only prove the code matches the spec. The `spec-gate` hook blocks code and test edits until the user approves a spec for the branch.
+Tests only prove the code matches the spec. The `spec-gate` hook warns on code and test edits until the user approves a spec for the branch.
 
 Run the `spec` skill first. It writes `docs/specs/<feature>.md` with the user and ends with the command the user runs to approve it: `scripts/approve-spec.sh docs/specs/<feature>.md`. Wait for the approval. Autonomous: draft the spec, commit it, and stop with a draft PR (the `spec` skill covers this). See `.claude/rules/specs.md`.
 
@@ -64,7 +64,7 @@ Repeat:
    ```
 
 Rules:
-- Never skip, delete, or weaken a test. A hook blocks commits that do.
+- Never skip, delete, or weaken a test. A hook warns on commits that do.
 - After 3 failed approaches to one failure, stop on that failure. Record it under Blocked. Continue with other parts.
 - Run the full test suite before step 6.
 
@@ -118,7 +118,7 @@ For any user-visible change (UI, screen, route, API response, CLI output), run t
    ## Dependencies
    - <package@version>: <reason> (only when you added one)
    ```
-   `pr-gate` blocks the PR when the branch changes code and the body lacks any of: test changes (or a `No-Test-Reason:` line), a filled Verification row, a `Spec:` line, or the Spec gaps section ("none" is allowed there). It also requires `Security-Review:` to name each Yellow file.
+   `pr-gate` warns when the branch changes code and the body lacks any of: test changes (or a `No-Test-Reason:` line), a filled Verification row, a `Spec:` line, or the Spec gaps section ("none" is allowed there). It also requires `Security-Review:` to name each Yellow file.
 3. Create the PR, or the merge request on GitLab. Pick the row that matches the remote:
 
    | Remote | Command |

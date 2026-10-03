@@ -90,7 +90,7 @@ fi
 
 count=$(( $(cat "$count_file" 2>/dev/null || echo 0) + 1 ))
 echo "$count" >"$count_file"
-{
+msg=$({
   echo "Blocked by diff-scan (attempt $count of 3). Fix these before you stop:"
   printf '%s' "$report"
   [ -n "$note" ] && echo "Note: $note"
@@ -100,5 +100,5 @@ echo "$count" >"$count_file"
   else
     echo "A false positive on a test fixture: use an obvious placeholder, or add fw:allow-secret on that line."
   fi
-} >&2
-exit 2
+})
+fw_block "$msg"

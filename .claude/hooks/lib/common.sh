@@ -84,9 +84,35 @@ fw_sha256() {
 
 # fw_block <message>. Exit 2 blocks the tool call or the stop and sends
 # stderr back to Claude.
+#
+# Advisory by default: the action goes ahead, Claude gets the finding as
+# context, and the user sees a one-line warning. A human sets FW_ENFORCE=1
+# in the settings env block to make the finding block instead (exit 2).
+fw_enforcing() {
+  [ "${FW_ENFORCE:-}" = 1 ]
+}
 fw_block() {
-  printf '%s\n' "$1" >&2
-  exit 2
+  local msg=$1 ev first
+  if fw_enforcing; then
+    printf '%s\n' "$msg" >&2
+    exit 2
+  fi
+  # Reword for advisory mode: a recommendation, not a block.
+  msg=$(printf '%s\n' "$msg" | sed -E '1s/^Blocked by ([A-Za-z-]+)/Recommendation from \1 (not blocked)/')
+  first=$(printf '%s\n' "$msg" | head -1 | cut -c1-160)
+  ev=$(fw_get '.hook_event_name')
+  if [ "$FW_HAS_JQ" = 1 ]; then
+    case "$ev" in
+      PreToolUse|PostToolUse|UserPromptSubmit)
+        jq -n --arg ev "$ev" --arg ctx "$msg" --arg m "$first" \
+          '{systemMessage: ("! " + $m), hookSpecificOutput: {hookEventName: $ev, additionalContext: $ctx}}' ;;
+      *)
+        jq -n --arg m "$msg" '{systemMessage: $m}' ;;
+    esac
+  else
+    printf '%s\n' "$msg"
+  fi
+  exit 0
 }
 
 # fw_context <event> <context> [visible message]

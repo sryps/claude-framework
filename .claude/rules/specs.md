@@ -4,9 +4,9 @@ Tests prove the code does what the spec says. They cannot prove the spec says wh
 
 ## Before code
 
-- MUST have a spec the user approved before any code or test edit. The `spec-gate` hook blocks those edits until the branch has an approval.
+- MUST have a spec the user approved before any code or test edit. The `spec-gate` hook warns on those edits until the branch has an approval.
 - Write the spec with the user: run the `spec` skill. It drafts `docs/specs/<feature>.md` and asks the user about each section.
-- The user approves with `scripts/approve-spec.sh docs/specs/<feature>.md`. Agents cannot run it. The approval holds the spec's hash, so any later change to the spec needs a new approval.
+- The user approves with `scripts/approve-spec.sh docs/specs/<feature>.md`. Agents never run it. The approval holds the spec's hash, so any later change to the spec needs a new approval.
 - A change with no behavior to specify (a typo, a version bump) needs the user's `scripts/approve-spec.sh --no-spec "<reason>"`.
 - The spec MUST give each acceptance criterion an ID (`AC-1`, `AC-2`) and state it so a test can pass or fail: Given, When, Then.
 - The spec MUST cover, or say "out of scope" for: error cases, empty and boundary values, permissions (who may and may not), limits (size, rate, time), and what happens to existing data.
@@ -15,7 +15,7 @@ Tests prove the code does what the spec says. They cannot prove the spec says wh
 ## Gaps
 
 - Attended: ask the user about each gap that changes what the user sees, what data is kept, or who can do what. Take the obvious default for the rest and state it.
-- A gap found while coding goes into the spec under Open questions, with your proposed choice. The spec changed, so the gate blocks code until the user approves again. Never code around a gap.
+- A gap found while coding goes into the spec under Open questions, with your proposed choice. The spec changed, so ask the user to approve again before you continue. Never code around a gap.
 - Autonomous: never ask. Draft the spec with every guess under Open questions, commit it, and stop with a draft PR. Code waits for the approval.
 - MUST NOT fill a gap silently. Every gap goes in the PR under `## Spec gaps and assumptions`, and into the spec as an open question when the user should decide it.
 

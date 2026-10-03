@@ -88,7 +88,7 @@ if [ "${minus:-0}" -gt "${plus:-0}" ]; then
 fi
 [ -z "$problems" ] && exit 0
 
-{
+msg=$({
   echo "Blocked by test-guard: this commit weakens the tests. It $problems."
   echo "Staged lines that tripped it:"
   printf '%s\n' "$added" | grep -E "$skip_re" | head -10
@@ -98,5 +98,5 @@ fi
   echo "commit again with a trailer that says why, for example:"
   echo "  git commit -m \"...\" -m \"Test-Change-Reason: the old assertion expected the pre-fix rounding\""
   echo "and record the change under Decisions in the final report."
-} >&2
-exit 2
+})
+fw_block "$msg"

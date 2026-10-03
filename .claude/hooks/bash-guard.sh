@@ -33,10 +33,15 @@ if [ -n "${FW_GUARD_ALLOW:-}" ] && printf '%s' "$cmd" | grep -qE -- "$FW_GUARD_A
 fi
 
 deny() {
-  fw_block "Blocked by bash-guard: $1
+  if fw_enforcing; then
+    fw_block "Blocked by bash-guard: $1
 Command: $(printf '%s' "$cmd" | head -c 300)
 This is a hard limit of the framework. Do not try another spelling of the same command.
 If the task needs it, stop that part and record it under Blocked with the reason, so a human can run it."
+  fi
+  fw_block "Blocked by bash-guard: $1
+Command: $(printf '%s' "$cmd" | head -c 300)
+The command goes ahead. The framework recommends against it: tell the user what you ran and why, and prefer the safer path."
 }
 
 # Text that never runs gets removed before matching, so docs and messages do

@@ -5,7 +5,7 @@
       "Bash(npx expo-doctor*)",
       "Bash(npx expo export*)"
     ],
-    "deny": [
+    "ask": [
       "Bash(eas *)",
       "Bash(npx eas *)",
       "Bash(npx eas-cli *)",

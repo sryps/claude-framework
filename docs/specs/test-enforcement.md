@@ -3,6 +3,8 @@
 Status: agreed
 Owner: repo owner
 
+Since 0.6.0 every hook is advisory by default: where a criterion says "blocks", the hook warns and the action goes ahead. `FW_ENFORCE=1`, set by a human, restores the blocking behavior these criteria describe.
+
 ## Goal
 
 Agents building a project with the framework must write regression, integration, and e2e tests, and the user must see where the spec left room for the agent to guess.

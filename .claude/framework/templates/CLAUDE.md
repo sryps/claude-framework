@@ -29,12 +29,12 @@ The Stop hook runs `make verify` when that target exists. Keep it complete and f
 |---|---|---|
 | Green | Feature code, tests, docs, refactors, local builds | Do it. |
 | Yellow | Auth, crypto, sessions, access control, migrations, CI, infra, dependency changes | Do it on a branch. Add a `Security-Review:` section to the PR. A human reviews before merge. |
-| Red | Merge, push to a protected branch, force push, deploy, publish, secrets, production data | Never. Hooks block it. Record the need under Blocked. |
+| Red | Merge, push to a protected branch, force push, deploy, publish, secrets, production data | Never. Hooks warn. Record the need under Blocked. |
 
 ## Workflow
 
 1. Start on a feature branch: `git switch -c <type>/<short-name>`.
-2. Write the spec with the user (`spec` skill). The user approves it with `scripts/approve-spec.sh docs/specs/<feature>.md`. Code and test edits are blocked until then.
+2. Write the spec with the user (`spec` skill). The user approves it with `scripts/approve-spec.sh docs/specs/<feature>.md`. Code and test edits get a warning until then.
 3. Read the rules file for each area you will change (list below).
 4. Write or update tests first. Name the criterion each test proves (`AC-1`).
 5. Make the smallest change that passes. Commit at each green state.

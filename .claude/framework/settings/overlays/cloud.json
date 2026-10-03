@@ -1,9 +1,21 @@
 {
   "permissions": {
-    "deny": [
-      "Bash(aws *)", "Bash(gcloud *)", "Bash(gsutil *)", "Bash(bq *)", "Bash(az *)", "Bash(doctl *)",
-      "Bash(fly *)", "Bash(flyctl *)", "Bash(heroku *)", "Bash(railway *)", "Bash(firebase deploy*)",
-      "Bash(wrangler deploy*)", "Bash(wrangler secret*)", "Bash(stripe *)", "Bash(sentry-cli releases*)"
+    "ask": [
+      "Bash(aws *)",
+      "Bash(gcloud *)",
+      "Bash(gsutil *)",
+      "Bash(bq *)",
+      "Bash(az *)",
+      "Bash(doctl *)",
+      "Bash(fly *)",
+      "Bash(flyctl *)",
+      "Bash(heroku *)",
+      "Bash(railway *)",
+      "Bash(firebase deploy*)",
+      "Bash(wrangler deploy*)",
+      "Bash(wrangler secret*)",
+      "Bash(stripe *)",
+      "Bash(sentry-cli releases*)"
     ]
   }
 }

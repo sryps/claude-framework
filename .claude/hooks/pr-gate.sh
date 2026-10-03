@@ -26,8 +26,11 @@ cmd=$(fw_get '.tool_input.command')
 [ -z "$cmd" ] && exit 0
 printf '%s' "$cmd" | grep -qE "(^|[;&|[:space:]])(gh[[:space:]]+pr[[:space:]]+(create|new|edit)|glab[[:space:]]+mr[[:space:]]+(create|new|update)|tea[[:space:]]+(pr|pulls)[[:space:]]+create)([[:space:]]|$)" || exit 0
 # An edit that does not replace the body (a new base branch, a label) passes.
-if printf '%s' "$cmd" | grep -qE "(gh[[:space:]]+pr[[:space:]]+edit|glab[[:space:]]+mr[[:space:]]+update)" && \
-   ! printf '%s' "$cmd" | grep -qE "[[:space:]](--body|--body-file|-b|-F|--description|-d)([[:space:]=]|$)"; then
+# Only the flags of the gh or glab command itself count, not those of a
+# chained `git commit -F msg && gh pr edit --base main`.
+edit_seg=$(printf '%s\n' "$cmd" | grep -oE "(gh[[:space:]]+pr[[:space:]]+edit|glab[[:space:]]+mr[[:space:]]+update)[^;&|]*" | head -1)
+if [ -n "$edit_seg" ] && \
+   ! printf '%s' "$edit_seg" | grep -qE "[[:space:]](--body|--body-file|-b|-F|--description|-d)([[:space:]=]|$)"; then
   exit 0
 fi
 fw_enter_project

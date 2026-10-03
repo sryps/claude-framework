@@ -71,7 +71,7 @@ fi
 count=$(( $(cat "$count_file" 2>/dev/null || echo 0) + 1 ))
 echo "$count" >"$count_file"
 
-{
+msg=$({
   if [ "$rc" -eq 124 ]; then
     echo "Test gate: \`$cmd\` timed out after ${limit}s (attempt $count of $max)."
   else
@@ -86,6 +86,6 @@ echo "$count" >"$count_file"
   else
     echo "Fix the cause, then stop again to rerun the tests."
   fi
-} >&2
+})
 rm -f "$log"
-exit 2
+fw_block "$msg"

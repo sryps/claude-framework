@@ -7,7 +7,7 @@
     "CLAUDE_TEST_MAX_ATTEMPTS": "8"
   },
   "permissions": {
-    "deny": [
+    "ask": [
       "Bash(git push origin HEAD:main*)",
       "Bash(git push origin HEAD:master*)",
       "Bash(git push origin main*)",

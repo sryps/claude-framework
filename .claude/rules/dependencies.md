@@ -30,7 +30,7 @@ A new dependency is Yellow tier. Run the `add-dependency` skill for each new pac
 
 ## Install
 
-- Add packages with the package manager (`npm install`, `pnpm add`, `uv add`, `cargo add`, `go get`). Hooks block hand edits to lockfiles.
+- Add packages with the package manager (`npm install`, `pnpm add`, `uv add`, `cargo add`, `go get`). Hooks warn on hand edits to lockfiles.
 - Commit the lockfile with the manifest change.
 - CI installs from the lockfile only: `npm ci`, `pnpm install --frozen-lockfile`, `uv sync --frozen`, `cargo build --locked`, `go mod download` with `go.sum`.
 - Turn off install scripts where the ecosystem allows it, or review them (`npm config set ignore-scripts true` with an allowlist).

@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Guide the user through writing the spec for a feature, then get their approval. Explains what a spec is, walks through each section with questions, drafts docs/specs/<feature>.md, and ends with the approval command. Code and tests are blocked until the user approves. Use at the start of any feature or behavior change, when spec-gate blocks an edit, or when the user asks to write or change a spec.
+description: Guide the user through writing the spec for a feature, then get their approval. Explains what a spec is, walks through each section with questions, drafts docs/specs/<feature>.md, and ends with the approval command. Code and tests should wait until the user approves. Use at the start of any feature or behavior change, when spec-gate warns about an edit, or when the user asks to write or change a spec.
 allowed-tools: Read, Write, Edit, Grep, Glob, AskUserQuestion
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read, Write, Edit, Grep, Glob, AskUserQuestion
 
 **Arguments:** `$ARGUMENTS` (the task, an issue, or a path to an existing spec)
 
-The `spec-gate` hook blocks every code and test edit until the user approves a spec for the branch. Your job here is to help the user write a spec good enough to approve. You draft. The user decides.
+The `spec-gate` hook warns on every code and test edit until the user approves a spec for the branch. Your job here is to help the user write a spec good enough to approve. You draft. The user decides.
 
 ## 0. Tell the user what this is
 
@@ -65,7 +65,7 @@ Show the user the spec file path and a 5-line summary: the criteria count, the m
 ! scripts/approve-spec.sh docs/specs/<feature>.md
 ```
 
-You cannot run it. Hooks block agents from the script and from `.claude/approvals/`. Wait for the user.
+Do not run it yourself, and do not write `.claude/approvals/`: the approval is the user's. Hooks warn if you try. Wait for the user.
 
 For a change too small for a spec (a typo, a version bump), the user may run instead:
 
@@ -79,7 +79,7 @@ Suggest it only when the change has no behavior to specify.
 
 - Commit the spec and the approval file with the first commit: `git add docs/specs/<feature>.md .claude/approvals/`.
 - Name each test after its criterion: `it("AC-2: ...")`.
-- When you find a gap while coding: stop, add it to the spec under Open questions with your proposed choice, and ask the user to approve again. The gate blocks code until they do. Never code around a gap.
+- When you find a gap while coding: stop, add it to the spec under Open questions with your proposed choice, and ask the user to approve again. Never code around a gap.
 
 ## Autonomous runs
 

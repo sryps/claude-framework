@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 
 **Arguments:** `$ARGUMENTS` (target version or bump type: major, minor, patch)
 
-You prepare. A human ships. Release, deploy, publish, tag push, and store submit are Red tier. Hooks block them. Do not look for another way to run them.
+You prepare. A human ships. Release, deploy, publish, tag push, and store submit are Red tier. Hooks warn on them. Do not look for another way to run them.
 
 ## 1. Find the last release
 
