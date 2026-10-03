@@ -101,13 +101,22 @@ fw_redact() {
       }
     }
     s = out s
-    # Long tokens: 20+ chars from [A-Za-z0-9_+=-] that contain a digit.
-    # Paths and hyphenated names stay readable ("/" and "." end a token).
+    # Token-like segments: runs of [A-Za-z0-9_+=-]. "/" and "." end a
+    # segment, so a base64 value with slashes and a JWT are checked piece by
+    # piece. A segment is masked when it has:
+    #   - 12+ chars with upper, lower, and a digit (base64, most API keys)
+    #   - 16+ chars with upper and a digit (AWS-style key IDs)
+    #   - 32+ chars with a digit (hex keys and hashes)
+    # Plain paths, short random names, and hyphenated words stay readable.
     out = ""; tok = ""
     for (i = 1; i <= length(s) + 1; i++) {
       c = (i <= length(s)) ? substr(s, i, 1) : ""
       if (c != "" && c ~ /[A-Za-z0-9_+=-]/) { tok = tok c; continue }
-      if (length(tok) >= 20 && tok ~ /[0-9]/) tok = substr(tok, 1, 4) "[REDACTED]"
+      n = length(tok)
+      if ((n >= 12 && tok ~ /[A-Z]/ && tok ~ /[a-z]/ && tok ~ /[0-9]/) || \
+          (n >= 16 && tok ~ /[A-Z]/ && tok ~ /[0-9]/) || \
+          (n >= 32 && tok ~ /[0-9]/))
+        tok = substr(tok, 1, 4) "[REDACTED]"
       out = out tok c; tok = ""
     }
     print out
