@@ -89,13 +89,29 @@ fw_redact() {
       cut = RSTART + RLENGTH - 1
       out = out substr(s, 1, cut); s = substr(s, cut + 1); l = substr(l, cut + 1)
       if (match(l, /^[^"\047 \t&]+/)) {
+        word = substr(l, 1, RLENGTH)
         out = out "[REDACTED]"; s = substr(s, RLENGTH + 1); l = substr(l, RLENGTH + 1)
+        # "Authorization: Bearer <token>": the scheme is not the secret, the
+        # next word is.
+        if (word == "bearer" || word == "basic" || word == "token" || word == "digest") {
+          if (match(l, /^[ \t]+[^"\047 \t&]+/)) {
+            out = out " [REDACTED]"; s = substr(s, RLENGTH + 1); l = substr(l, RLENGTH + 1)
+          }
+        }
       }
     }
-    print out s
-  }' | sed -E \
-    -e 's/([A-Za-z0-9_+\/=.-]{4})[A-Za-z0-9_+\/=.-]{16,}/\1[REDACTED]/g' \
-    -e 's#(://[^:/@[:space:]]+:)[^@/[:space:]]+@#\1[REDACTED]@#g'
+    s = out s
+    # Long tokens: 20+ chars from [A-Za-z0-9_+=-] that contain a digit.
+    # Paths and hyphenated names stay readable ("/" and "." end a token).
+    out = ""; tok = ""
+    for (i = 1; i <= length(s) + 1; i++) {
+      c = (i <= length(s)) ? substr(s, i, 1) : ""
+      if (c != "" && c ~ /[A-Za-z0-9_+=-]/) { tok = tok c; continue }
+      if (length(tok) >= 20 && tok ~ /[0-9]/) tok = substr(tok, 1, 4) "[REDACTED]"
+      out = out tok c; tok = ""
+    }
+    print out
+  }' | sed -E 's#(://[^:/@[:space:]]+:)[^@/[:space:]]+@#\1[REDACTED]@#g'
 }
 
 # fw_log_warning <one line>. Appends an advisory finding to
