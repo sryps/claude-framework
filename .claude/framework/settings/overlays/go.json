@@ -1,9 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(go build*)", "Bash(go test*)", "Bash(go vet*)", "Bash(go mod tidy)", "Bash(go mod download)",
-      "Bash(gofmt *)", "Bash(golangci-lint run*)", "Bash(govulncheck*)", "Bash(staticcheck*)"
+      "Bash(go build*)",
+      "Bash(go test*)",
+      "Bash(go vet*)",
+      "Bash(go mod tidy)",
+      "Bash(go mod download)",
+      "Bash(gofmt *)",
+      "Bash(golangci-lint run*)",
+      "Bash(govulncheck*)",
+      "Bash(staticcheck*)"
     ],
-    "deny": ["Bash(goreleaser*)", "Bash(go install*)"]
+    "ask": [
+      "Bash(goreleaser*)",
+      "Bash(go install*)"
+    ]
   }
 }

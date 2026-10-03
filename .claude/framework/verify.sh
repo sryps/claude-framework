@@ -35,12 +35,12 @@ done
 [ "$bad" = 0 ] && pass "JSON files parse" || fail "JSON files parse"
 
 step "settings carry the framework guards"
-# Every base deny rule and every hook command must be in the project
+# Every base ask rule and every hook command must be in the project
 # settings. Projects may add more, never fewer.
 check_settings() {
   local f=$1 missing
   missing=$(jq -n --slurpfile base $FWD/settings/base.json --slurpfile hooks $FWD/settings/hooks.json --slurpfile cur "$f" '
-    ($base[0].permissions.deny - ($cur[0].permissions.deny // []))
+    ($base[0].permissions.ask - ($cur[0].permissions.ask // []))
     + ([$hooks[0].hooks[][].hooks[].command] - [($cur[0].hooks // {})[][]?.hooks[]?.command])
     | .[]' -r)
   if [ -z "$missing" ]; then pass "$f"; else fail "$f is missing:"; printf '  %s\n' "$missing"; fi

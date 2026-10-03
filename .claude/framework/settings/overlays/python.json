@@ -1,13 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pytest*)", "Bash(uv run pytest*)", "Bash(poetry run pytest*)", "Bash(python -m pytest*)",
-      "Bash(ruff check*)", "Bash(ruff format*)", "Bash(mypy *)", "Bash(pyright*)",
-      "Bash(uv sync*)", "Bash(uv add *)", "Bash(pip-audit*)"
+      "Bash(pytest*)",
+      "Bash(uv run pytest*)",
+      "Bash(poetry run pytest*)",
+      "Bash(python -m pytest*)",
+      "Bash(ruff check*)",
+      "Bash(ruff format*)",
+      "Bash(mypy *)",
+      "Bash(pyright*)",
+      "Bash(uv sync*)",
+      "Bash(uv add *)",
+      "Bash(pip-audit*)"
     ],
-    "deny": [
-      "Bash(twine upload*)", "Bash(uv publish*)", "Bash(poetry publish*)", "Bash(hatch publish*)", "Bash(flit publish*)",
-      "Bash(pip install --break-system-packages*)", "Bash(sudo pip*)"
+    "ask": [
+      "Bash(twine upload*)",
+      "Bash(uv publish*)",
+      "Bash(poetry publish*)",
+      "Bash(hatch publish*)",
+      "Bash(flit publish*)",
+      "Bash(pip install --break-system-packages*)",
+      "Bash(sudo pip*)"
     ]
   }
 }

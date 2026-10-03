@@ -31,11 +31,51 @@ FW_SECRET_TEMPLATE_RE='\.(example|sample|template|dist|defaults)(\.[A-Za-z0-9]+)
 # Test files, fixtures, and test setup. Used by test-writer-scope.sh.
 FW_TEST_PATH_RE='(^|/)(__tests__|__mocks__|__snapshots__|__fixtures__|tests?|specs?|e2e|cypress|playwright|\.maestro|testdata|fixtures)/|\.(test|spec)\.[A-Za-z0-9]+$|_test\.(go|py|ts|js|rb|exs?)$|(^|/)test_[^/]*\.py$|[A-Za-z0-9](Test|Tests|Spec)\.(swift|kt|java|cs|scala)$|(^|/)(conftest\.py|(jest|vitest)\.setup\.[cm]?[jt]s|playwright\.config\.[cm]?[jt]s)$'
 
+# fw_spec_approval. Checks the human approval for the current branch
+# (.claude/approvals/<branch>.json, written by scripts/approve-spec.sh).
+# Valid: prints the approved spec path, or "none" for a --no-spec approval,
+# and returns 0. Not valid: prints the reason and returns 1.
+fw_spec_approval() {
+  local branch file spec want have
+  branch=$(git -C "$FW_ROOT" branch --show-current 2>/dev/null)
+  if [ -z "$branch" ]; then echo "detached HEAD, so there is no branch to hold a spec approval."; return 1; fi
+  file="$FW_ROOT/.claude/approvals/$(printf '%s' "$branch" | tr '/' '_' | tr -c 'A-Za-z0-9._-' '_').json"
+  if [ ! -f "$file" ]; then echo "no approved spec for branch $branch."; return 1; fi
+  if [ "$FW_HAS_JQ" = 1 ]; then
+    spec=$(jq -r '.spec // empty' "$file" 2>/dev/null)
+    want=$(jq -r '.sha256 // empty' "$file" 2>/dev/null)
+  else
+    spec=$(sed -nE 's/.*"spec"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$file" | head -1)
+    want=$(sed -nE 's/.*"sha256"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$file" | head -1)
+  fi
+  if [ "$spec" = none ]; then echo none; return 0; fi
+  if [ -z "$spec" ] || [ ! -f "$FW_ROOT/$spec" ]; then echo "the approved spec ${spec:-?} does not exist."; return 1; fi
+  have=$(fw_sha256 "$FW_ROOT/$spec")
+  if [ "$have" != "$want" ]; then
+    echo "$spec changed since the user approved it. The user must read the change and approve again."
+    return 1
+  fi
+  echo "$spec"
+}
+
+# fw_is_test_change <path>. A test file that is not documentation, so a spec
+# in docs/specs/ or a README under tests/ never counts as a test.
+fw_is_test_change() {
+  printf '%s' "$1" | grep -qE "$FW_TEST_PATH_RE" || return 1
+  printf '%s' "$1" | grep -qiE '\.(md|markdown|txt|rst|adoc)$' && return 1
+  return 0
+}
+
+# Source code. A branch that changes these needs tests, verification, and a
+# spec reference in the PR (pr-gate.sh). Test files match FW_TEST_PATH_RE
+# first and do not count as code.
+FW_CODE_RE='\.(js|jsx|ts|tsx|mjs|cjs|vue|svelte|astro|py|go|rs|rb|java|kt|kts|swift|m|mm|cs|fs|php|c|cc|cpp|h|hpp|scala|dart|ex|exs|erl|clj|lua|zig|sh|bash|sql)$'
+
 FW_LOCKFILE_RE='(^|/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|Podfile\.lock|pubspec\.lock|flake\.lock)$'
 
 # Files that control the agent itself. An agent that edits these can turn off
 # its own guards. Settings and git internals stay Red even for maintainers.
-FW_CONTROL_RE='(^|/)\.claude/settings[^/]*\.json$|(^|/)\.git/|(^|/)\.mcp\.json$'
+FW_CONTROL_RE='(^|/)\.claude/settings[^/]*\.json$|(^|/)\.git/|(^|/)\.mcp\.json$|(^|/)\.claude/approvals/|(^|/)scripts/approve-spec\.sh$'
 FW_GUARD_RE='(^|/)\.claude/hooks/|(^|/)\.claude/framework/|(^|/)\.githooks/|(^|/)scripts/(security-check|claude-autonomous)\.sh$|(^|/)\.husky/|(^|/)\.pre-commit-config\.yaml$|(^|/)lefthook\.ya?ml$'
 # Instructions the agent follows. A project may tune them, with review.
 FW_YELLOW_AGENT_RE='(^|/)\.claude/(skills|agents|rules|output-styles|commands)/|(^|/)\.claude/pull_request_template\.md$'

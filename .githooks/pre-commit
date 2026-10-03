@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
-# Scan staged changes for secrets before each commit.
-# Installed by the framework install.sh --git-hooks.
-root=$(git rev-parse --show-toplevel) || exit 1
-[ -x "$root/scripts/security-check.sh" ] || exit 0
-exec bash "$root/scripts/security-check.sh" --staged
+# Run scripts/security-check.sh --staged before each commit.
+# Advisory by default: findings are printed and the commit goes ahead.
+# Set FW_ENFORCE=1 in your environment to make findings stop the commit.
+root=$(git rev-parse --show-toplevel) || exit 0
+[ -f "$root/scripts/security-check.sh" ] || exit 0
+bash "$root/scripts/security-check.sh" --staged && exit 0
+if [ "${FW_ENFORCE:-}" = 1 ]; then
+  echo "security-check failed. The commit is stopped (FW_ENFORCE=1)." >&2
+  exit 1
+fi
+echo "security-check found problems (above). The commit goes ahead; fix them before review." >&2
+exit 0

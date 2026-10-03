@@ -74,7 +74,7 @@ Other databases: put the same rules in the data access layer, with tests.
 
 1. Reset and apply all migrations from zero:
    ```bash
-   supabase db reset          # or: alembic upgrade head on a local DB. prisma migrate reset is blocked by bash-guard; recreate the local DB with docker compose instead
+   supabase db reset          # or: alembic upgrade head on a local DB. bash-guard warns on prisma migrate reset; recreate the local DB with docker compose instead
    ```
 2. Run the down step, then up again, if the tool supports it.
 3. Run the DB tests. Add tests for each new policy: owner can, other user cannot, anon cannot. Use pgTAP (`supabase test db`) or the repo's test setup.

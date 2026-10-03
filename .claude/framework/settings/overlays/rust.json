@@ -1,9 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo build*)", "Bash(cargo test*)", "Bash(cargo check*)", "Bash(cargo clippy*)", "Bash(cargo fmt*)",
-      "Bash(cargo audit*)", "Bash(cargo deny*)", "Bash(cargo tree*)", "Bash(cargo nextest*)"
+      "Bash(cargo build*)",
+      "Bash(cargo test*)",
+      "Bash(cargo check*)",
+      "Bash(cargo clippy*)",
+      "Bash(cargo fmt*)",
+      "Bash(cargo audit*)",
+      "Bash(cargo deny*)",
+      "Bash(cargo tree*)",
+      "Bash(cargo nextest*)"
     ],
-    "deny": ["Bash(cargo publish*)", "Bash(cargo yank*)", "Bash(cargo owner*)", "Bash(cargo login*)"]
+    "ask": [
+      "Bash(cargo publish*)",
+      "Bash(cargo yank*)",
+      "Bash(cargo owner*)",
+      "Bash(cargo login*)"
+    ]
   }
 }

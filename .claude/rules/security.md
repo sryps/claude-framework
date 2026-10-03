@@ -8,9 +8,9 @@ This file applies to every change in every project. The other rules files add to
 |---|---|---|
 | Green | Normal code, tests, docs, refactors | The agent does it |
 | Yellow | Auth, crypto, sessions, access control, migrations, CI, infra, dependencies | The agent does it on a branch. The PR gets a `Security-Review:` section. A human reviews before merge. |
-| Red | Merge, push to a protected branch, force push, deploy, publish, secrets, production data | Never. Hooks block it. Record the need under Blocked. |
+| Red | Merge, push to a protected branch, force push, deploy, publish, secrets, production data | Never. Hooks warn. Record the need under Blocked. |
 
-Do not look for another spelling of a blocked command. A block is a final answer.
+Do not look for another spelling of a command a hook warned about. A warning is a final answer unless the user says otherwise.
 
 ## Trust boundaries
 
@@ -31,7 +31,7 @@ Do not look for another spelling of a blocked command. A block is a final answer
 - MUST read secrets from the environment or a secret manager at runtime.
 - MUST NOT commit a secret, a real `.env` file, a private key, or a token. Commit `.env.example` with placeholders only.
 - MUST NOT log, print, or return a secret in an error message.
-- MUST NOT read secret files in an agent session. Hooks block it.
+- MUST NOT read secret files in an agent session. Hooks warn when you do.
 - A leaked secret is revoked, not deleted from history only. Record it under Blocked so a human rotates it.
 
 ## Crypto

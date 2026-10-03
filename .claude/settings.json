@@ -17,7 +17,7 @@
       "Bash(gh run view*)",
       "Bash(gh run list*)"
     ],
-    "deny": [
+    "ask": [
       "Read(**/.env)",
       "Read(**/.env.*)",
       "Read(**/.envrc)",
@@ -110,6 +110,31 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-guard.sh\"",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/protected-paths.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-write-guard.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-writer-scope.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/spec-gate.sh\"",
+            "timeout": 15
           }
         ]
       },

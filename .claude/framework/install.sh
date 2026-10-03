@@ -194,7 +194,7 @@ if [ "$inplace" = 0 ]; then
       sync_file "$SRC/.claude/$dir/$f" "$target/.claude/$dir/$f"
     done <"$tmp/files"
   done
-  for f in scripts/security-check.sh scripts/claude-autonomous.sh .githooks/pre-commit .githooks/pre-push; do
+  for f in scripts/security-check.sh scripts/claude-autonomous.sh scripts/approve-spec.sh .githooks/pre-commit .githooks/pre-push; do
     sync_file "$SRC/$f" "$target/$f"
   done
 fi
@@ -227,6 +227,17 @@ else
   # shellcheck disable=SC2086
   merge_json $layers >"$tmp/settings.json"
 fi
+# The framework recommends, it does not refuse: its rules live under "ask".
+# Earlier versions put them under "deny". Drop those old deny entries, and
+# keep any deny rule the project added itself.
+# shellcheck disable=SC2086
+jq -s '[.[].permissions.ask // [] | .[]] | unique' $layers "$FWD/settings/autonomous.json" "$FWD/settings/overlays/"*.json >"$tmp/fw-ask.json"
+jq --slurpfile ask "$tmp/fw-ask.json" '
+  if .permissions.deny then
+    .permissions.deny -= $ask[0]
+    | if (.permissions.deny | length) == 0 then del(.permissions.deny) else . end
+  else . end' "$tmp/settings.json" >"$tmp/settings.migrated.json"
+mv "$tmp/settings.migrated.json" "$tmp/settings.json"
 install_json "$existing" "$tmp/settings.json"
 
 if [ "$autonomous" = 1 ]; then

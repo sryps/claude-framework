@@ -36,23 +36,26 @@ ok "rules copied" '[ -f "$P/.claude/rules/security.md" ]'
 ok "styles copied" '[ -f "$P/.claude/output-styles/autonomous.md" ]'
 ok "framework copied" '[ -f "$P/.claude/framework/install.sh" ] && [ -f "$P/.claude/framework/settings/base.json" ]'
 ok "manifest written" '[ -s "$P/.claude/framework/manifest.tsv" ] && grep -q "^.claude/hooks/bash-guard.sh	" "$P/.claude/framework/manifest.tsv"'
-ok "scripts copied" '[ -x "$P/scripts/security-check.sh" ] && [ -x "$P/scripts/claude-autonomous.sh" ]'
+ok "scripts copied" '[ -x "$P/scripts/security-check.sh" ] && [ -x "$P/scripts/claude-autonomous.sh" ] && [ -f "$P/scripts/approve-spec.sh" ]'
+ok "spec-gate wired" 'jq -e "[.hooks.PreToolUse[].hooks[].command] | any(test(\"spec-gate.sh\"))" "$S" >/dev/null'
 ok "githooks copied" '[ -x "$P/.githooks/pre-commit" ]'
 ok "hook wiring in settings" 'jq -e "[.hooks.PreToolUse[].hooks[].command] | any(test(\"CLAUDE_PROJECT_DIR/.claude/hooks/bash-guard.sh\"))" "$S" >/dev/null'
 ok "stop hooks wired" 'jq -e ".hooks.Stop | length > 0" "$S" >/dev/null'
 ok "existing scalar kept" '[ "$(jq -r .model "$S")" = opus ]'
 ok "existing deny kept" 'jq -e ".permissions.deny | index(\"Bash(rm -rf /*)\")" "$S" >/dev/null'
-ok "base deny added" 'jq -e ".permissions.deny | index(\"Read(**/.env)\")" "$S" >/dev/null'
-ok "supabase overlay detected" 'jq -e ".permissions.deny | index(\"Bash(supabase db push*)\")" "$S" >/dev/null'
-ok "expo overlay detected" 'jq -e ".permissions.deny | index(\"Bash(eas *)\")" "$S" >/dev/null'
-ok "node overlay detected" 'jq -e ".permissions.deny | index(\"Bash(npm publish*)\")" "$S" >/dev/null'
-ok "no duplicate denies" '[ "$(jq "[.permissions.deny[]] | length" "$S")" = "$(jq "[.permissions.deny[]] | unique | length" "$S")" ]'
+ok "framework adds no deny rules" '[ "$(jq "[.permissions.deny // [] | .[] | select(. != \"Bash(rm -rf /*)\")] | length" "$S")" = 0 ]'
+
+ok "base rule added as ask" 'jq -e ".permissions.ask | index(\"Read(**/.env)\")" "$S" >/dev/null'
+ok "supabase overlay detected" 'jq -e ".permissions.ask | index(\"Bash(supabase db push*)\")" "$S" >/dev/null'
+ok "expo overlay detected" 'jq -e ".permissions.ask | index(\"Bash(eas *)\")" "$S" >/dev/null'
+ok "node overlay detected" 'jq -e ".permissions.ask | index(\"Bash(npm publish*)\")" "$S" >/dev/null'
+ok "no duplicate ask rules" '[ "$(jq "[.permissions.ask[]] | length" "$S")" = "$(jq "[.permissions.ask[]] | unique | length" "$S")" ]'
 ok "no plugin keys" '! jq -e "has(\"enabledPlugins\") or has(\"extraKnownMarketplaces\")" "$S" >/dev/null'
-ok "attended has no cloud deny" '! jq -e ".permissions.deny | index(\"Bash(aws *)\")" "$S" >/dev/null'
+ok "attended has no cloud rule" '! jq -e ".permissions.ask | index(\"Bash(aws *)\")" "$S" >/dev/null'
 ok "autonomous profile env" '[ "$(jq -r .env.CLAUDE_PROFILE "$A")" = autonomous ]'
 ok "autonomous style" '[ "$(jq -r .outputStyle "$A")" = Autonomous ]'
-ok "autonomous has cloud deny" 'jq -e ".permissions.deny | index(\"Bash(aws *)\")" "$A" >/dev/null'
-ok "autonomous holds only additions" '! jq -e "has(\"hooks\") or (.permissions.deny | index(\"Read(**/.env)\"))" "$A" >/dev/null'
+ok "autonomous has cloud rule" 'jq -e ".permissions.ask | index(\"Bash(aws *)\")" "$A" >/dev/null'
+ok "autonomous holds only additions" '! jq -e "has(\"hooks\") or (.permissions.ask | index(\"Read(**/.env)\"))" "$A" >/dev/null'
 ok "CLAUDE.md written" '[ -f "$P/CLAUDE.md" ]'
 ok "PR template in .claude" '[ -f "$P/.claude/pull_request_template.md" ]'
 ok "no GitHub files without a GitHub remote" '[ ! -d "$P/.github" ]'
@@ -86,6 +89,14 @@ ok "update reports kept file" 'grep -q "keep     .claude/rules/auth.md" "$TMP/ou
 bash "$NEWFW/.claude/framework/install.sh" --force "$P" >/dev/null 2>&1
 ok "force replaces edited file" 'grep -q "upstream change" "$P/.claude/rules/auth.md" && [ -f "$P/.claude/rules/auth.md.bak" ]'
 
+# --- migration from the enforcing versions ---
+M="$TMP/migrate"; mkdir -p "$M/.claude"
+echo '{"permissions":{"deny":["Read(**/.env)","Bash(git push --force*)","Bash(my-custom-deny*)"]}}' >"$M/.claude/settings.json"
+inst "$M"
+ok "migration drops old framework deny" '! jq -e ".permissions.deny | index(\"Read(**/.env)\")" "$M/.claude/settings.json" >/dev/null'
+ok "migration keeps the project deny" 'jq -e ".permissions.deny == [\"Bash(my-custom-deny*)\"]" "$M/.claude/settings.json" >/dev/null'
+ok "migration adds the ask rule" 'jq -e ".permissions.ask | index(\"Read(**/.env)\")" "$M/.claude/settings.json" >/dev/null'
+
 # --- fork: configure in place ---
 F="$TMP/fork"
 mkdir -p "$F"
@@ -95,7 +106,7 @@ before=$(cd "$F/.claude/hooks" && ls | wc -l | tr -d ' ')
 bash "$F/.claude/framework/install.sh" >"$TMP/out" 2>&1
 ok "in-place exit 0" '[ $? -eq 0 ]'
 ok "in-place mode reported" 'grep -q "configure in place" "$TMP/out"'
-ok "in-place adds overlay" 'jq -e ".permissions.deny | index(\"Bash(npm publish*)\")" "$F/.claude/settings.json" >/dev/null'
+ok "in-place adds overlay" 'jq -e ".permissions.ask | index(\"Bash(npm publish*)\")" "$F/.claude/settings.json" >/dev/null'
 ok "in-place keeps hooks" '[ "$(cd "$F/.claude/hooks" && ls | wc -l | tr -d " ")" = "$before" ]'
 ok "in-place writes no manifest" '[ ! -f "$F/.claude/framework/manifest.tsv" ]'
 ok "in-place remembers overlays" '(cd "$F" && rm package.json && bash .claude/framework/install.sh --check >/dev/null 2>&1)'
@@ -103,7 +114,7 @@ ok "in-place remembers overlays" '(cd "$F" && rm package.json && bash .claude/fr
 # --- options ---
 P2="$TMP/proj2"; mkdir -p "$P2"
 inst --overlay rust --sandbox --no-autonomous --ci none "$P2"
-ok "explicit overlay" 'jq -e ".permissions.deny | index(\"Bash(cargo publish*)\")" "$P2/.claude/settings.json" >/dev/null'
+ok "explicit overlay" 'jq -e ".permissions.ask | index(\"Bash(cargo publish*)\")" "$P2/.claude/settings.json" >/dev/null'
 ok "sandbox overlay" 'jq -e ".sandbox.enabled == true" "$P2/.claude/settings.json" >/dev/null'
 ok "no autonomous file" '[ ! -f "$P2/.claude/settings.autonomous.json" ]'
 ok "bad overlay fails" '! inst --overlay nope "$P2"'

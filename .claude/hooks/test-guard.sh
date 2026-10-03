@@ -1,38 +1,63 @@
 #!/usr/bin/env bash
-# PreToolUse hook (Bash): refuse a `git commit` whose staged diff weakens tests.
+# PreToolUse hook (Bash): check the tests in each `git commit`.
 #
-# Blocks when staged changes to test files
-#   - add a skip or focus marker (.skip, .only, xit, xdescribe, it.todo,
-#     Deno ignore/only, pgTAP skip/todo, #[ignore], t.Skip, pytest skip), or
-#   - remove more assertions than they add.
+# 1. A bug fix needs a regression test. A commit whose subject starts with
+#    `fix:` or `fix(scope):` must add or change a test file.
+#    Escape hatch: a `No-Test-Reason:` trailer that says why.
+# 2. A commit must not weaken tests. Blocks when staged changes to test files
+#    - add a skip or focus marker (.skip, .only, xit, xdescribe, it.todo,
+#      Deno ignore/only, pgTAP skip/todo, #[ignore], t.Skip, pytest skip), or
+#    - remove more assertions than they add.
+#    Escape hatch: a `Test-Change-Reason:` trailer that says why.
+# Either trailer puts the reason on record for the reviewer.
 #
-# Escape hatch: a `Test-Change-Reason:` trailer in the commit message, so a
-# deliberate change (a test that was wrong) goes through with its reason on
-# record for the reviewer.
-#
-# Runs in the autonomous profile. Set FW_TEST_GUARD=always to run it in
-# attended sessions too.
+# Runs in every session. A human can turn it off with FW_TEST_GUARD=off in
+# the project settings env block.
 set -uo pipefail
 . "$(dirname "$0")/lib/common.sh"
+. "$(dirname "$0")/lib/policy.sh"
 
-fw_autonomous || [ "${FW_TEST_GUARD:-}" = always ] || exit 0
+[ "${FW_TEST_GUARD:-}" = off ] && exit 0
 [ "$FW_HAS_JQ" = 1 ] || exit 0
 
 fw_read_input
 cmd=$(fw_get '.tool_input.command')
 printf '%s' "$cmd" | grep -qE '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+commit([[:space:]]|$)' || exit 0
-printf '%s' "$cmd" | grep -q 'Test-Change-Reason:' && exit 0
 
 fw_enter_project
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
+# The commit message: the first -m value, or the file given to -F.
+subject=$(printf '%s\n' "$cmd" | grep -oE "(-[a-zA-Z]*m|--message)[[:space:]=]+(\"[^\"]*|'[^']*)" | head -1 | sed -E "s/^[^\"']*[\"']//")
+msgfile=$(printf '%s\n' "$cmd" | sed -nE 's/.*[[:space:]](-F|--file)[[:space:]=]+([^[:space:]]+).*/\2/p' | head -1)
+message=$cmd
+if [ -n "$msgfile" ] && [ -f "$msgfile" ]; then
+  message=$(cat "$msgfile")
+  [ -z "$subject" ] && subject=$(head -1 "$msgfile")
+fi
+
 # `git commit -a` / `--all` stages tracked changes as part of the commit.
 if printf '%s' "$cmd" | grep -qE 'git[^;&|]*commit[^;&|]*[[:space:]](-a|--all|-[a-zA-Z]*a[a-zA-Z]*)([[:space:]]|$)'; then
   diff=$(git diff HEAD -U0 2>/dev/null)
+  names=$(git diff HEAD --name-only 2>/dev/null)
 else
   diff=$(git diff --cached -U0 2>/dev/null)
+  names=$(git diff --cached --name-only 2>/dev/null)
 fi
 [ -z "$diff" ] && exit 0
+
+# 1. A fix needs a test.
+if printf '%s' "$subject" | grep -qE '^fix(\([^)]*\))?!?:' && \
+   ! printf '%s' "$message" | grep -q 'No-Test-Reason:' && \
+   ! printf '%s\n' "$names" | while IFS= read -r n; do fw_is_test_change "$n" && echo yes; done | grep -q yes; then
+  fw_block "Blocked by test-guard: this is a fix commit, and it changes no test file.
+Subject: $subject
+A fix starts with a failing test that reproduces the bug. Name the test after the bug, confirm it fails without the fix, then commit both together.
+If no test can cover this fix (a typo in a comment, a build script), commit again with a trailer that says why:
+  git commit -m \"fix: ...\" -m \"No-Test-Reason: <why no test can cover it>\""
+fi
+
+printf '%s' "$message" | grep -q 'Test-Change-Reason:' && exit 0
 
 # Keep only hunks from test files.
 tests=$(printf '%s\n' "$diff" | awk '
@@ -63,7 +88,7 @@ if [ "${minus:-0}" -gt "${plus:-0}" ]; then
 fi
 [ -z "$problems" ] && exit 0
 
-{
+msg=$({
   echo "Blocked by test-guard: this commit weakens the tests. It $problems."
   echo "Staged lines that tripped it:"
   printf '%s\n' "$added" | grep -E "$skip_re" | head -10
@@ -73,5 +98,5 @@ fi
   echo "commit again with a trailer that says why, for example:"
   echo "  git commit -m \"...\" -m \"Test-Change-Reason: the old assertion expected the pre-fix rounding\""
   echo "and record the change under Decisions in the final report."
-} >&2
-exit 2
+})
+fw_block "$msg"

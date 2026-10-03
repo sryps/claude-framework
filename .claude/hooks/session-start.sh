@@ -27,13 +27,15 @@ Nobody is watching this run.
 1. Never ask the user a question. Decide, record the decision, continue.
 2. Loop build and test until green. A Stop hook reruns the tests and a secret and SAST scan.
 3. Never skip or weaken a test. After 3 failed approaches, record it under Blocked.
-4. Red tier is blocked by hooks: merge, push to a protected branch, force push, deploy, publish, secrets, prod data. Do not look for another spelling.
+4. Red tier gets a hook warning; do not do it: merge, push to a protected branch, force push, deploy, publish, secrets, prod data. Do not look for another spelling.
 5. Yellow tier (auth, crypto, migrations, CI, infra, dependencies) is allowed on a branch. The PR needs a Security-Review: section.
 6. End on a branch with a PR. Never merge it.
-7. End with the full final report."
+7. End with the full final report.
+8. Code and tests should wait for a spec the user approved. Without one, draft the spec (spec skill), commit it, and stop with a draft PR. Record every gap and choice under Spec gaps."
 else
   add "## Framework: attended profile
-Tiers: Green = do it. Yellow (auth, crypto, migrations, CI, infra, dependencies) = do it on a branch and add a Security-Review: section to the PR. Red (merge, protected-branch push, force push, deploy, publish, secrets, prod data) = hooks block it; ask the user instead."
+Tiers: Green = do it. Yellow (auth, crypto, migrations, CI, infra, dependencies) = do it on a branch and add a Security-Review: section to the PR. Red (merge, protected-branch push, force push, deploy, publish, secrets, prod data) = hooks warn; ask the user instead.
+Specs: recommended before code. Code and test edits get a warning until the user approves a spec for this branch. Run the spec skill to write it with the user, then the user runs scripts/approve-spec.sh."
 fi
 
 if [ "${FW_SESSION_GIT:-1}" != 0 ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -84,6 +86,15 @@ ls ./*.tf >/dev/null 2>&1 && stack="$stack terraform"
 if [ -n "$stack" ]; then
   add ""
   add "## Stack:$stack"
+fi
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "${FW_SPEC_GATE:-}" != off ]; then
+  . "$(dirname "$0")/lib/policy.sh"
+  if approval=$(fw_spec_approval); then
+    if [ "$approval" = none ]; then add "Spec: the user approved this branch without a spec."
+    else add "Spec: $approval is approved and unchanged. Code and test edits are open."; fi
+  else
+    add "Spec: $approval Recommended: write the spec with the user and get their approval before code."
+  fi
 fi
 if [ -d .claude/rules ]; then
   add "Rules live in .claude/rules/. Read the file for the area you change before you change it (security.md always)."

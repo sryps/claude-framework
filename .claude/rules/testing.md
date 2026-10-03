@@ -25,7 +25,7 @@ Run the `test-strategy` skill to pick the levels for a change. Run `verify-spec`
 ## General rules
 
 - MUST write the test before or with the code. A behavior change without a test is not done.
-- MUST NOT delete, skip, or weaken a test to make it pass. Hooks block `.skip`, `.only`, `xit`, `#[ignore]`, `t.Skip`, and assertion removal.
+- MUST NOT delete, skip, or weaken a test to make it pass. Hooks warn on `.skip`, `.only`, `xit`, `#[ignore]`, `t.Skip`, and assertion removal.
 - If a test is wrong, fix it only when the task makes the right behavior clear. Add a `Test-Change-Reason:` trailer to the commit.
 - MUST NOT change an assertion to match wrong output. Fix the code.
 - Tests MUST be deterministic. Control time, randomness, and network. MUST NOT sleep to wait for state.

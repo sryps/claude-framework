@@ -69,7 +69,7 @@ A HIGH or CRITICAL advisory with a fix: use the fixed version. Without a fix: do
 
 ## 8. Add it
 
-Use the package manager. Never edit a lockfile by hand. A hook blocks that.
+Use the package manager. Never edit a lockfile by hand. A hook warns when you do.
 
 ```bash
 npm install <pkg>@<version>        # or pnpm add, yarn add, bun add
