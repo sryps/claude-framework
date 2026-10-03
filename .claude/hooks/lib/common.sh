@@ -76,6 +76,24 @@ fw_timeout() {
   fi
 }
 
+# fw_log_warning <one line>. Appends an advisory finding to
+# .claude/runs/warnings.log (gitignored), so nothing a hook let through gets
+# lost: warnings-report.sh puts the session's warnings in front of the user
+# at the end of a run, in the final report and the PR.
+# Format: time<TAB>session<TAB>hook<TAB>tool detail<TAB>finding
+fw_log_warning() {
+  local root dir session hook detail line
+  root=${FW_ROOT:-${CLAUDE_PROJECT_DIR:-}}
+  [ -z "$root" ] && root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+  dir="$root/.claude/runs"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  session=$(fw_get '.session_id'); [ -z "$session" ] && session=unknown
+  hook=$(basename "$0" .sh)
+  detail=$(fw_get '.tool_input.command // .tool_input.file_path // .tool_input.notebook_path' | head -1 | cut -c1-200)
+  line=$(printf '%s\t%s\t%s\t%s\t%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$session" "$hook" "$detail" "$1" | tr '\n' ' ')
+  printf '%s\n' "$line" >>"$dir/warnings.log" 2>/dev/null || true
+}
+
 # fw_sha256 <file>. GNU coreutils or macOS shasum.
 fw_sha256() {
   if fw_have sha256sum; then sha256sum "$1" | awk '{print $1}'
@@ -101,6 +119,7 @@ fw_block() {
   msg=$(printf '%s\n' "$msg" | sed -E '1s/^Blocked by ([A-Za-z-]+)/Recommendation from \1 (not blocked)/')
   first=$(printf '%s\n' "$msg" | head -1 | cut -c1-160)
   ev=$(fw_get '.hook_event_name')
+  fw_log_warning "$first"
   if [ "$FW_HAS_JQ" = 1 ]; then
     case "$ev" in
       PreToolUse|PostToolUse|UserPromptSubmit)

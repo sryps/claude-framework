@@ -604,6 +604,30 @@ name="advisory clean command stays silent"
 out=$(json_bash "git status" | pre | bash "$HOOKS/bash-guard.sh"); rc=$?
 if [ "$rc" = 0 ] && [ -z "$out" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
   FAIL $name: rc=$rc out=$out"; fi
+# Warnings are logged, reported at stop, and asked for in the PR.
+name="advisory warnings are logged"
+if grep -q "	t	bash-guard	git push origin main	" "$REPO/.claude/runs/warnings.log" 2>/dev/null; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: $(head -3 "$REPO/.claude/runs/warnings.log" 2>/dev/null)"; fi
+name="advisory spec-gate warns once per branch"
+out=$(json_write "$REPO/src/app/c.ts" x | pre | bash "$HOOKS/spec-gate.sh"); rc=$?
+if [ "$rc" = 0 ] && [ -z "$out" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: rc=$rc out=$(printf '%s' "$out" | head -c 200)"; fi
+adv "warnings-report summarizes for the attended user" warnings-report "$(json_stop)" .systemMessage "Framework warnings this session"
+name="warnings-report stays quiet when nothing is new"
+out=$(json_stop | bash "$HOOKS/warnings-report.sh"); if [ -z "$out" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: $out"; fi
+adv "a new warning after the summary" bash-guard "$(json_bash "git reset --hard" | pre)" .systemMessage "bash-guard"
+export CLAUDE_PROFILE=autonomous
+adv "warnings-report sends an autonomous run back to report" warnings-report "$(json_stop)" .reason "Framework warnings"
+adv "the reason lists the new warning" warnings-report "$(json_bash "git clean -fd" | pre | bash "$HOOKS/bash-guard.sh" >/dev/null; json_stop)" .reason "git clean -fd"
+unset CLAUDE_PROFILE
+printf '%b' "$SPEC$VER$GAPS$SR" > "$TMP/nw.md"
+adv "pr-gate asks for a Framework warnings section" pr-gate "$(json_bash "gh pr create --title t --body-file $TMP/nw.md" | pre)" .hookSpecificOutput.additionalContext "Framework warnings"
+printf '%b' "$SPEC$VER$GAPS## Framework warnings\n\n- bash-guard: push to main, went ahead on request\n\n$SR" > "$TMP/nw2.md"
+name="pr-gate quiet with a Framework warnings section"
+out=$(json_bash "gh pr create --title t --body-file $TMP/nw2.md" | pre | bash "$HOOKS/pr-gate.sh"); if ! printf '%s' "$out" | grep -q 'Framework warnings'; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); FAILED="$FAILED
+  FAIL $name: $(printf '%s' "$out" | head -c 300)"; fi
+
 export FW_ENFORCE=1
 
 echo "pass: $PASS  fail: $FAIL"

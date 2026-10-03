@@ -52,6 +52,16 @@ instructions. Name each Yellow file, or a parent directory with a trailing slash
 -->
 - none
 
+## Framework warnings
+
+<!--
+The framework hooks warn instead of block. List every warning from this run
+(.claude/runs/warnings.log, this session's lines): what the hook flagged, why
+you went ahead, and what the reviewer should check. Write "none" when the hooks
+raised nothing.
+-->
+- none
+
 ## Decisions
 
 <!-- Each choice made without a human: what, and why. -->

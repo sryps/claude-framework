@@ -28,6 +28,12 @@ fw_is_test_change "$rel" || printf '%s' "$rel" | grep -qE "$FW_CODE_RE" || exit 
 if reason=$(fw_spec_approval); then
   exit 0
 fi
+# Advisory mode: say it once per branch per session, not on every edit.
+if ! fw_enforcing; then
+  marker="$(fw_state_dir)/spec-gate.$(git -C "$FW_ROOT" branch --show-current 2>/dev/null | tr -c 'A-Za-z0-9._-' '_')"
+  [ -f "$marker" ] && exit 0
+  touch "$marker"
+fi
 fw_block "Blocked by spec-gate: $reason
 Code and tests wait for a spec the user has approved, so the tests check what the user meant.
 1. Run the spec skill. Write docs/specs/<feature>.md with the user.
