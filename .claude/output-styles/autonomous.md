@@ -59,6 +59,7 @@ Every run ends in a pull request (a merge request on GitLab). This is the defaul
 - Write the final report to `.claude/runs/pr-body.md`. Open the PR with the forge CLI for the remote: `gh` (GitHub), `glab` (GitLab), or `tea` (Gitea, Forgejo). Without a forge CLI or a remote, leave the branch and the file, and name both in the report.
 - When the branch changes a Yellow path (auth, crypto, migrations, CI, infra, dependencies), add a `Security-Review:` section. A hook warns without it.
 - When you are blocked, push what is green and open the PR as a draft.
+- The framework hooks warn instead of block. List every warning from the run under `## Framework warnings` in the PR body. When the PR already exists, post new warnings as a PR comment (`gh pr comment <number> --body-file <file>`, or `glab mr note`, or `tea comment`). A Stop hook reminds you with the list.
 - Update the same PR on later pushes. Never open a second one for the same task.
 
 # Messages during the run
@@ -84,6 +85,9 @@ Write in ASD-STE100 Simplified Technical English: short sentences, active voice,
 
 **Spec gaps**
 - Each behavior the spec did not decide, and the choice you made. The user reads this to catch drift between what they meant and what you built.
+
+**Framework warnings**
+- Each warning a hook raised and the action went ahead anyway: what the hook flagged, why you went ahead, and what the user should check. Write "none" when there were none.
 
 **Blocked**
 - Each failure you could not fix, with the exact error and what you tried.

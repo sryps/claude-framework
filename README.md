@@ -14,6 +14,10 @@ By default every hook is advisory:
 - You see a one-line warning that starts with `!`.
 - Framework permission rules are `ask` rules, so Claude Code asks you before, for example, reading `.env` or force-pushing. Nothing is a `deny` rule.
 - The git hooks (`--git-hooks`) print `security-check.sh` findings and let the commit or push go through.
+- Every warning is logged to `.claude/runs/warnings.log`, so none gets lost:
+  - Attended: when Claude stops, you get a summary of the session's warnings.
+  - Unattended: before it stops, the agent is sent back once to list every warning in the final report and the PR body, and to post them as a PR comment when the PR already exists.
+  - `pr-gate` asks for a `## Framework warnings` section in any PR opened during a session that had warnings.
 
 To make the hooks and git hooks block instead, set `FW_ENFORCE=1` in the `env` block of `.claude/settings.local.json` (just you) or `.claude/settings.json` (the whole team). Then a finding stops the tool call, the commit, or the stop, as earlier versions did.
 
@@ -123,6 +127,7 @@ Each hook warns by default and blocks with `FW_ENFORCE=1`.
 | PostToolUse Edit/Write | `format-lint` | Runs the project formatter and linter on the file |
 | Stop | `diff-scan` | Secret scan (gitleaks or built-in patterns) on changed files; semgrep in autonomous runs |
 | Stop | `test-gate` | Runs the tests before the agent may stop (autonomous) |
+| Stop | `warnings-report` | Lists the session's hook warnings: a summary for you when attended; in autonomous runs, one extra turn for the agent to put them in the final report, the PR body, and a PR comment |
 
 ### Skills (`.claude/skills/`)
 

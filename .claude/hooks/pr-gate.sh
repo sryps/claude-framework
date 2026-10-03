@@ -153,6 +153,15 @@ if [ -n "$code" ]; then
   fi
 fi
 
+# --- warnings the hooks let through in this session ---
+wlog="$FW_ROOT/.claude/runs/warnings.log"
+wsession=$(fw_get '.session_id')
+if [ -f "$wlog" ] && [ -n "$wsession" ] && awk -F'\t' -v s="$wsession" '$2 == s {found = 1} END {exit !found}' "$wlog"; then
+  if ! printf '%s' "$clean" | grep -q '## Framework warnings'; then
+    problem "The framework hooks warned during this session and let the actions go ahead. Add a '## Framework warnings' section that lists each one, why you went ahead, and what the reviewer should check. The list is in .claude/runs/warnings.log (this session's lines)."
+  fi
+fi
+
 # --- Yellow paths ---
 if [ -n "$yellow" ]; then
   before=$problems

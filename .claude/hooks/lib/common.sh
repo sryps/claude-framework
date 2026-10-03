@@ -76,6 +76,73 @@ fw_timeout() {
   fi
 }
 
+# fw_redact <text>. Masks values that may be secrets: the value after a
+# key-like name (token=, password:, Authorization: Bearer ...), and any run of
+# 20 or more token characters (keys, JWTs, hashes). Keeps the first 4 chars.
+fw_redact() {
+  # Case-insensitive key match in awk (BSD sed has no I flag), then the
+  # long-token and URL-password rules in portable sed.
+  printf '%s\n' "$1" | awk '{
+    s = $0; l = tolower(s); out = ""
+    re = "(pass(word)?|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|authorization|auth|bearer|basic|cookie|session|private[_-]?key|client[_-]?secret)[\"\047]?[ \t]*[:= ][ \t]*[\"\047]?"
+    while (match(l, re)) {
+      cut = RSTART + RLENGTH - 1
+      out = out substr(s, 1, cut); s = substr(s, cut + 1); l = substr(l, cut + 1)
+      if (match(l, /^[^"\047 \t&]+/)) {
+        word = substr(l, 1, RLENGTH)
+        out = out "[REDACTED]"; s = substr(s, RLENGTH + 1); l = substr(l, RLENGTH + 1)
+        # "Authorization: Bearer <token>": the scheme is not the secret, the
+        # next word is.
+        if (word == "bearer" || word == "basic" || word == "token" || word == "digest") {
+          if (match(l, /^[ \t]+[^"\047 \t&]+/)) {
+            out = out " [REDACTED]"; s = substr(s, RLENGTH + 1); l = substr(l, RLENGTH + 1)
+          }
+        }
+      }
+    }
+    s = out s
+    # Token-like segments: runs of [A-Za-z0-9_+=-]. "/" and "." end a
+    # segment, so a base64 value with slashes and a JWT are checked piece by
+    # piece. A segment is masked when it has:
+    #   - 12+ chars with upper, lower, and a digit (base64, most API keys)
+    #   - 16+ chars with upper and a digit (AWS-style key IDs)
+    #   - 20+ chars with a digit (hex keys, hashes, lowercase tokens)
+    # Plain paths, short random names, and hyphenated words stay readable.
+    out = ""; tok = ""
+    for (i = 1; i <= length(s) + 1; i++) {
+      c = (i <= length(s)) ? substr(s, i, 1) : ""
+      if (c != "" && c ~ /[A-Za-z0-9_+=-]/) { tok = tok c; continue }
+      n = length(tok)
+      if ((n >= 12 && tok ~ /[A-Z]/ && tok ~ /[a-z]/ && tok ~ /[0-9]/) || \
+          (n >= 16 && tok ~ /[A-Z]/ && tok ~ /[0-9]/) || \
+          (n >= 20 && tok ~ /[0-9]/))
+        tok = substr(tok, 1, 4) "[REDACTED]"
+      out = out tok c; tok = ""
+    }
+    print out
+  }' | sed -E 's#(://[^:/@[:space:]]+:)[^@/[:space:]]+@#\1[REDACTED]@#g'
+}
+
+# fw_log_warning <one line>. Appends an advisory finding to
+# .claude/runs/warnings.log (gitignored), so nothing a hook let through gets
+# lost: warnings-report.sh puts the session's warnings in front of the user
+# at the end of a run, in the final report and the PR.
+# Format: time<TAB>session<TAB>hook<TAB>tool detail<TAB>finding
+fw_log_warning() {
+  local root dir session hook detail line
+  root=${FW_ROOT:-${CLAUDE_PROJECT_DIR:-}}
+  [ -z "$root" ] && root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+  dir="$root/.claude/runs"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  session=$(fw_get '.session_id'); [ -z "$session" ] && session=unknown
+  hook=$(basename "$0" .sh)
+  detail=$(fw_get '.tool_input.command // .tool_input.file_path // .tool_input.notebook_path' | head -1 | cut -c1-200)
+  # The log ends up in the final report, the PR body, and PR comments, so
+  # redact anything that may be a secret before it is written.
+  line=$(printf '%s\t%s\t%s\t%s\t%s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$session" "$hook" "$(fw_redact "$detail")" "$(fw_redact "$1")" | tr '\n' ' ')
+  printf '%s\n' "$line" >>"$dir/warnings.log" 2>/dev/null || true
+}
+
 # fw_sha256 <file>. GNU coreutils or macOS shasum.
 fw_sha256() {
   if fw_have sha256sum; then sha256sum "$1" | awk '{print $1}'
@@ -101,6 +168,7 @@ fw_block() {
   msg=$(printf '%s\n' "$msg" | sed -E '1s/^Blocked by ([A-Za-z-]+)/Recommendation from \1 (not blocked)/')
   first=$(printf '%s\n' "$msg" | head -1 | cut -c1-160)
   ev=$(fw_get '.hook_event_name')
+  fw_log_warning "$first"
   if [ "$FW_HAS_JQ" = 1 ]; then
     case "$ev" in
       PreToolUse|PostToolUse|UserPromptSubmit)

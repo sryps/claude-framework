@@ -62,6 +62,9 @@ Write the same text to the PR body and as your last message. Use these sections,
 **Decisions**
 - <choice made without the user>: <reason>
 
+**Framework warnings**
+- <hook>: <what it flagged>. Went ahead because <reason>. Check: <what the user should look at>.
+
 **Blocked**
 - <failure>: exact error:
   ```
