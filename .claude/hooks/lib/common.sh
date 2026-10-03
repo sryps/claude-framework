@@ -106,7 +106,7 @@ fw_redact() {
     # piece. A segment is masked when it has:
     #   - 12+ chars with upper, lower, and a digit (base64, most API keys)
     #   - 16+ chars with upper and a digit (AWS-style key IDs)
-    #   - 32+ chars with a digit (hex keys and hashes)
+    #   - 20+ chars with a digit (hex keys, hashes, lowercase tokens)
     # Plain paths, short random names, and hyphenated words stay readable.
     out = ""; tok = ""
     for (i = 1; i <= length(s) + 1; i++) {
@@ -115,7 +115,7 @@ fw_redact() {
       n = length(tok)
       if ((n >= 12 && tok ~ /[A-Z]/ && tok ~ /[a-z]/ && tok ~ /[0-9]/) || \
           (n >= 16 && tok ~ /[A-Z]/ && tok ~ /[0-9]/) || \
-          (n >= 32 && tok ~ /[0-9]/))
+          (n >= 20 && tok ~ /[0-9]/))
         tok = substr(tok, 1, 4) "[REDACTED]"
       out = out tok c; tok = ""
     }
