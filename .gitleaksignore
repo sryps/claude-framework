@@ -1,0 +1,3 @@
+# Fake test fixture (a runtime-built hex string in a curl -H test line),
+# replaced in efa1450. Kept here so history scans do not flag the old commit.
+94295c83d7d1f6a5f42017841050f6c9cd726061:.claude/framework/tests/hooks-test.sh:curl-auth-header:628
