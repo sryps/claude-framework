@@ -59,7 +59,7 @@ jobs:
         run: semgrep scan --config p/default --sarif --output semgrep.sarif --metrics off --error --severity ERROR
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: semgrep.sarif
 
@@ -69,7 +69,7 @@ jobs:
       contents: read
       actions: read
       security-events: write
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
     with:
       scan-args: |-
         --recursive
@@ -109,7 +109,7 @@ jobs:
         with:
           persist-credentials: false
       - if: steps.graph.outputs.enabled == 'true'
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           fail-on-severity: high
           deny-licenses: AGPL-3.0, GPL-3.0
@@ -139,6 +139,6 @@ jobs:
           exit-code: "1"
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
         with:
           sarif_file: trivy.sarif
